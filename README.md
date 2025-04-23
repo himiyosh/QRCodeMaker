@@ -9,30 +9,6 @@ This project is a web-based application for generating and decoding QR codes. Us
 - **Multi-language Support**: Supports both English and Japanese.
 - **Responsive Design**: Optimized for mobile and desktop devices.
 
-## Technologies Used
-
-- HTML5
-- CSS3
-- JavaScript
-- [QRCode.js](https://github.com/soldair/node-qrcode)
-- [jsQR](https://github.com/cozmo/jsQR)
-
-## How to Use
-
-1. Clone this repository:
-
-   ```bash
-   git clone https://github.com/your-username/QRCodeMaker.git
-   ```
-
-2. Navigate to the project folder:
-
-   ```bash
-   cd QRCodeMaker
-   ```
-
-3. Open `Index.html` in your browser.
-
 ### QR Code Generation
 
 1. Enter text in the input field.
@@ -53,14 +29,6 @@ QRCodeMaker/
 ├── README.md
 └── assets/ (if applicable, for images or additional resources)
 ```
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
-
-## Contributing
-
-Contributions are welcome! Feel free to open an issue or submit a pull request.
 
 ## Acknowledgments
 
