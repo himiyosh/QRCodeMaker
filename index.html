@@ -3,8 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:,">
   <title>QRコード作成・解読ツール</title>
   <style>
+    /* Hallmark · pre-emit critique: P4 H3 E4 S5 R4 V3 */
+    /* Hallmark · component: QR generation workbench · genre: atmospheric · theme: existing cyan
+     * states: default · hover · focus · active · disabled · loading · error · success
+     * contrast: pass (WCAG 2.1 scoped minimum 7.15:1)
+     */
     /* 背景用キャンバス */
     #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
     /* 全体スタイル */
@@ -43,33 +49,67 @@
     /* モバイル対応 */
     @media (max-width: 480px) {
       .container { padding: 1rem; }
-      input[type=text] { padding: 0.4rem; }
-      button.action { padding: 0.4rem 0.8rem; font-size: 0.9rem; }
+      button.action { padding-inline: 0.8rem; font-size: 0.9rem; }
     }
     #lang-switch { text-align: right; margin-bottom: 1rem; }
     #lang-btn {
       background: none;
       border: 1px solid #6fc3df;
       color: #6fc3df;
-      padding: 0.25rem 0.5rem;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0.5rem;
       border-radius: 4px;
       cursor: pointer;
     }
     #lang-btn:hover { background-color: rgba(111,195,223,0.2); }
     h1 { margin: 0.5rem 0; }
+    .field {
+      width: 100%;
+      margin: 0.75rem auto;
+      text-align: left;
+    }
+    .field-label {
+      display: block;
+      margin-bottom: 0.25rem;
+      color: #e0f7fa;
+      font-weight: bold;
+    }
     input[type=text] {
       width: 100%;
       padding: 0.5rem;
-      margin: 0.5rem auto;
+      min-height: 44px;
+      margin: 0;
       border: 1px solid #6fc3df;
       border-radius: 4px;
       background: #222;
       color: #e0f7fa;
       box-sizing: border-box;
     }
+    input[type=text][aria-invalid="true"] {
+      border-color: #ffb3b3;
+    }
+    .helper {
+      min-height: 1.4em;
+      margin: 0.25rem 0 0;
+      color: #9fdae9;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .helper[data-state="error"] {
+      color: #ffb3b3;
+    }
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
     button.action {
       display: inline-block;
-      margin: 0.5rem 0.5rem;
+      min-height: 44px;
+      margin: 0.5rem 0;
       padding: 0.5rem 1rem;
       font-size: 1rem;
       border: none;
@@ -77,12 +117,34 @@
       cursor: pointer;
       background-color: #6fc3df;
       color: #002f3e;
-      transition: background-color 0.3s, box-shadow 0.3s;
+      white-space: nowrap;
+      transition: background-color 120ms, transform 120ms;
     }
     button.action:hover {
       background-color: #8ed5e6;
-      box-shadow: 0 0 8px rgba(111,195,223,0.6);
     }
+    button.action:active { transform: translateY(1px); }
+    button.action:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    button.action.secondary {
+      border: 1px solid #6fc3df;
+      background: transparent;
+      color: #9fdae9;
+    }
+    button.action.secondary:hover { background: rgba(111,195,223,0.12); }
+    #lang-btn:focus-visible,
+    input[type=text]:focus-visible {
+      outline: 3px solid #8ed5e6;
+      outline-offset: 3px;
+    }
+    button.action:focus-visible {
+      outline: 3px solid #002f3e;
+      outline-offset: 0;
+      box-shadow: 0 0 0 5px #fff;
+    }
+    [hidden] { display: none !important; }
     canvas {
       display: block;
       margin: 1rem auto;
@@ -92,6 +154,35 @@
       max-width: 100%;
       height: auto;
     }
+    .qr-preview {
+      display: grid;
+      width: min(100%, 256px);
+      aspect-ratio: 1;
+      margin: 1rem auto 0;
+      place-items: center;
+      border: 1px dashed #6fc3df;
+      border-radius: 4px;
+      background: rgba(111,195,223,0.05);
+      box-sizing: border-box;
+    }
+    .qr-preview[data-state="ready"] {
+      border-style: solid;
+      background: #fff;
+    }
+    .qr-preview canvas {
+      width: 100%;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: #fff;
+    }
+    .preview-empty {
+      max-width: 18ch;
+      margin: 0;
+      color: #9fdae9;
+      line-height: 1.5;
+    }
+    #generate-status { text-align: center; }
     #result {
       text-align: center;
       font-weight: bold;
@@ -104,6 +195,7 @@
       font-size: 1.1rem;
       color: #fff; /* 読みやすい白文字 */
     }
+    #result:empty { display: none; }
     #drop-zone {
       border: 2px dashed #6fc3df;
       border-radius: 8px;
@@ -116,6 +208,10 @@
       box-sizing: border-box;
     }
     #drop-zone.hover { border-color: #fff; color: #fff; }
+    @media (prefers-reduced-motion: reduce) {
+      button.action { transition: none; }
+      button.action:active { transform: none; }
+    }
   </style>
 </head>
 <body>
@@ -126,9 +222,20 @@
 
     <div class="section" id="generate">
       <h2 id="gen-title">生成</h2>
-      <input id="text-input" type="text" placeholder="テキストを入力">
-      <button id="generate-btn" class="action">QRコードを生成</button>
-      <canvas id="generate-canvas" width="200" height="200" draggable="true"></canvas>
+      <div class="field">
+        <label id="text-label" class="field-label" for="text-input">QRコードにするテキスト</label>
+        <input id="text-input" type="text" placeholder="例: https://example.com" aria-describedby="text-helper generate-status" aria-invalid="false">
+        <p id="text-helper" class="helper">先頭や末尾の空白も入力どおりに保存されます</p>
+      </div>
+      <div class="button-row">
+        <button id="generate-btn" class="action">QRコードを生成</button>
+        <button id="download-btn" class="action secondary" hidden>PNGを保存</button>
+      </div>
+      <div id="generate-preview" class="qr-preview" data-state="empty">
+        <p id="preview-empty" class="preview-empty">生成したQRコードがここに表示されます</p>
+        <canvas id="generate-canvas" hidden width="256" height="256" draggable="true" aria-label="生成されたQRコード"></canvas>
+      </div>
+      <p id="generate-status" class="helper" role="status" aria-live="polite"></p>
       <p id="hint" style="font-size:0.9rem; color:#6fc3df;">生成したQRコードをドラッグして解読エリアにドロップできます</p>
     </div>
 
@@ -150,14 +257,60 @@
   <script>
     // 多言語テキスト
     const texts = {
-      ja: { title: 'QRコード作成・解読ツール', genTitle: '生成', decTitle: '解読', inputPlaceholder: 'テキストを入力', generateBtn: 'QRコードを生成', hint: '生成したQRコードをドラッグして解読エリアにドロップできます', dropZone: 'ここに画像をドラッグ＆ドロップ', fileBtn: 'またはファイル選択', resetBtn: 'リセット', decoded: '解読結果: ', notFound: 'QRコードが見つかりませんでした' },
-      en: { title: 'QR Code Generator & Reader', genTitle: 'Generate', decTitle: 'Decode', inputPlaceholder: 'Enter text', generateBtn: 'Generate QR Code', hint: 'Drag the generated QR code here to decode', dropZone: 'Drag & drop an image here', fileBtn: 'Or select a file', resetBtn: 'Reset', decoded: 'Decoded: ', notFound: 'QR code not found' }
+      ja: {
+        title: 'QRコード作成・解読ツール',
+        genTitle: '生成',
+        decTitle: '解読',
+        inputLabel: 'QRコードにするテキスト',
+        inputPlaceholder: '例: https://example.com',
+        inputHelper: '先頭や末尾の空白も入力どおりに保存されます',
+        inputRequired: 'テキストが空です。QRコードにする内容を入力してください。',
+        generateBtn: 'QRコードを生成',
+        generating: '生成中…',
+        generated: count => `QRコードを生成しました（${count}文字）`,
+        generationFailed: 'QRコードを生成できませんでした。入力を短くして、もう一度お試しください。',
+        previewEmpty: '生成したQRコードがここに表示されます',
+        previewLabel: '生成されたQRコード',
+        downloadBtn: 'PNGを保存',
+        downloaded: 'QRコードをPNGで保存しました',
+        hint: '生成したQRコードをドラッグして解読エリアにドロップできます',
+        dropZone: 'ここに画像をドラッグ＆ドロップ',
+        fileBtn: 'またはファイル選択',
+        resetBtn: 'リセット',
+        decoded: '解読結果: ',
+        notFound: 'QRコードが見つかりませんでした',
+        switchLanguage: 'Switch to English'
+      },
+      en: {
+        title: 'QR Code Generator & Reader',
+        genTitle: 'Generate',
+        decTitle: 'Decode',
+        inputLabel: 'Text to encode',
+        inputPlaceholder: 'Example: https://example.com',
+        inputHelper: 'Leading and trailing spaces are preserved exactly',
+        inputRequired: 'The text is empty. Enter the content to encode.',
+        generateBtn: 'Generate QR Code',
+        generating: 'Generating…',
+        generated: count => `QR code ready (${count} characters)`,
+        generationFailed: 'The QR code could not be generated. Shorten the input and try again.',
+        previewEmpty: 'Your generated QR code will appear here',
+        previewLabel: 'Generated QR code',
+        downloadBtn: 'Save PNG',
+        downloaded: 'QR code saved as a PNG',
+        hint: 'Drag the generated QR code here to decode it',
+        dropZone: 'Drag & drop an image here',
+        fileBtn: 'Or select a file',
+        resetBtn: 'Reset',
+        decoded: 'Decoded: ',
+        notFound: 'QR code not found',
+        switchLanguage: '日本語に切り替える'
+      }
     };
     let lang = 'ja';
-    const langBtn = document.getElementById('lang-btn');
-    function setLanguage(l) { lang = l; const t = texts[l]; document.getElementById('title').innerText = t.title; document.getElementById('gen-title').innerText = t.genTitle; document.getElementById('dec-title').innerText = t.decTitle; document.getElementById('text-input').placeholder = t.inputPlaceholder; document.getElementById('generate-btn').innerText = t.generateBtn; document.getElementById('hint').innerText = t.hint; document.getElementById('drop-zone').innerText = t.dropZone; document.getElementById('decode-btn').innerText = t.fileBtn; document.getElementById('reset-btn').innerText = t.resetBtn; }
-    langBtn.addEventListener('click', () => { const newLang = lang === 'ja' ? 'en' : 'ja'; setLanguage(newLang); langBtn.innerText = lang === 'ja' ? 'EN' : 'JA'; });
-    setLanguage(lang);
+    let generationState = 'empty';
+    let generatedText = '';
+    let decodedState = 'empty';
+    let decodedData = '';
 
     // 背景アニメーション（移動+回転）
     const bgCanvas = document.getElementById('bg-canvas');
@@ -208,27 +361,223 @@
     drawBg();
 
     // QR生成と解読
+    const langBtnEl = document.getElementById('lang-btn');
     const generateBtnEl = document.getElementById('generate-btn');
+    const downloadBtnEl = document.getElementById('download-btn');
     const textInputEl = document.getElementById('text-input');
+    const textLabelEl = document.getElementById('text-label');
+    const textHelperEl = document.getElementById('text-helper');
+    const generatePreviewEl = document.getElementById('generate-preview');
+    const previewEmptyEl = document.getElementById('preview-empty');
+    const generateStatusEl = document.getElementById('generate-status');
     const generateCanvasEl = document.getElementById('generate-canvas');
-    const generateCtxEl = generateCanvasEl.getContext('2d');
+    const generateCtxEl = generateCanvasEl.getContext('2d', { willReadFrequently: true });
     const fileInputEl = document.getElementById('file-input');
     const decodeBtnEl = document.getElementById('decode-btn');
     const resetBtnEl = document.getElementById('reset-btn');
     const decodeCanvasEl = document.getElementById('decode-canvas');
-    const decodeCtxEl = decodeCanvasEl.getContext('2d');
+    const decodeCtxEl = decodeCanvasEl.getContext('2d', { willReadFrequently: true });
     const resultPEl = document.getElementById('result');
     const dropZoneEl = document.getElementById('drop-zone');
-    generateCanvasEl.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain',generateCanvasEl.toDataURL()));
-    generateBtnEl.addEventListener('click',()=>{const txt=textInputEl.value.trim(); if(!txt){alert(texts[lang].inputPlaceholder);return;} QRCode.toCanvas(generateCanvasEl,txt,{width:200,margin:1});});
-    function decodeImage(img){const SIZE=200;decodeCanvasEl.hidden=false;decodeCanvasEl.width=SIZE;decodeCanvasEl.height=SIZE;decodeCtxEl.clearRect(0,0,SIZE,SIZE);decodeCtxEl.drawImage(img,0,0,SIZE,SIZE);const data=decodeCtxEl.getImageData(0,0,SIZE,SIZE);const code=jsQR(data.data,data.width,data.height);resultPEl.textContent=code?texts[lang].decoded+code.data:texts[lang].notFound;}
-    function handleFile(file){const rdr=new FileReader();rdr.onload=e=>{const img=new Image();img.onload=()=>decodeImage(img);img.src=e.target.result;};rdr.readAsDataURL(file);}
-    function handleDataURL(url){const img=new Image();img.onload=()=>decodeImage(img);img.src=url;}
-    dropZoneEl.addEventListener('dragover',e=>{e.preventDefault();dropZoneEl.classList.add('hover');});
-    dropZoneEl.addEventListener('dragleave',()=>dropZoneEl.classList.remove('hover'));
-    dropZoneEl.addEventListener('drop',e=>{e.preventDefault();dropZoneEl.classList.remove('hover');const dt=e.dataTransfer;if(dt.files&&dt.files.length)handleFile(dt.files[0]);else{const u=dt.getData('text/plain');if(u&&u.startsWith('data:image'))handleDataURL(u);else resultPEl.textContent=texts[lang].notFound;}});
-    decodeBtnEl.addEventListener('click',()=>fileInputEl.click());fileInputEl.addEventListener('change',()=>{if(fileInputEl.files.length)handleFile(fileInputEl.files[0]);});
-    resetBtnEl.addEventListener('click',()=>{textInputEl.value='';generateCtxEl.clearRect(0,0,generateCanvasEl.width,generateCanvasEl.height);decodeCanvasEl.hidden=true;decodeCtxEl.clearRect(0,0,decodeCanvasEl.width,decodeCanvasEl.height);resultPEl.textContent='';fileInputEl.value=null;});
+
+    function renderGenerationState() {
+      const t = texts[lang];
+      const hasPreview = generationState === 'ready' || generationState === 'downloaded';
+      generateBtnEl.disabled = generationState === 'generating';
+      generateBtnEl.textContent = generationState === 'generating' ? t.generating : t.generateBtn;
+      downloadBtnEl.hidden = !hasPreview;
+      generateCanvasEl.hidden = !hasPreview;
+      previewEmptyEl.hidden = hasPreview;
+      generatePreviewEl.dataset.state = hasPreview ? 'ready' : 'empty';
+      textInputEl.setAttribute('aria-invalid', generationState === 'error' ? 'true' : 'false');
+      textHelperEl.textContent = generationState === 'error' ? t.inputRequired : t.inputHelper;
+      textHelperEl.dataset.state = generationState === 'error' ? 'error' : '';
+      generateStatusEl.dataset.state = generationState === 'failed' ? 'error' : '';
+
+      if (generationState === 'error') {
+        generateStatusEl.textContent = '';
+      } else if (generationState === 'generating') {
+        generateStatusEl.textContent = t.generating;
+      } else if (generationState === 'ready') {
+        generateStatusEl.textContent = t.generated(Array.from(generatedText).length);
+      } else if (generationState === 'downloaded') {
+        generateStatusEl.textContent = t.downloaded;
+      } else if (generationState === 'failed') {
+        generateStatusEl.textContent = t.generationFailed;
+      } else {
+        generateStatusEl.textContent = '';
+      }
+    }
+
+    function renderDecodedResult() {
+      if (decodedState === 'success') {
+        resultPEl.textContent = texts[lang].decoded + decodedData;
+      } else if (decodedState === 'notFound') {
+        resultPEl.textContent = texts[lang].notFound;
+      } else {
+        resultPEl.textContent = '';
+      }
+    }
+
+    function setLanguage(newLang) {
+      lang = newLang;
+      const t = texts[lang];
+      document.documentElement.lang = lang;
+      document.title = t.title;
+      document.getElementById('title').textContent = t.title;
+      document.getElementById('gen-title').textContent = t.genTitle;
+      document.getElementById('dec-title').textContent = t.decTitle;
+      textLabelEl.textContent = t.inputLabel;
+      textInputEl.placeholder = t.inputPlaceholder;
+      textHelperEl.textContent = t.inputHelper;
+      previewEmptyEl.textContent = t.previewEmpty;
+      generateCanvasEl.setAttribute('aria-label', t.previewLabel);
+      downloadBtnEl.textContent = t.downloadBtn;
+      document.getElementById('hint').textContent = t.hint;
+      dropZoneEl.textContent = t.dropZone;
+      decodeBtnEl.textContent = t.fileBtn;
+      resetBtnEl.textContent = t.resetBtn;
+      langBtnEl.textContent = lang === 'ja' ? 'EN' : 'JA';
+      langBtnEl.setAttribute('aria-label', t.switchLanguage);
+      renderGenerationState();
+      renderDecodedResult();
+    }
+
+    async function generateQRCode() {
+      const text = textInputEl.value;
+      if (text.length === 0) {
+        generationState = 'error';
+        renderGenerationState();
+        textInputEl.focus();
+        return;
+      }
+
+      generationState = 'generating';
+      renderGenerationState();
+      try {
+        await new Promise((resolve, reject) => {
+          QRCode.toCanvas(
+            generateCanvasEl,
+            text,
+            { width: 256, margin: 4, errorCorrectionLevel: 'M' },
+            error => error ? reject(error) : resolve()
+          );
+        });
+        generatedText = text;
+        generationState = 'ready';
+      } catch (error) {
+        console.error('QR generation failed', error);
+        generatedText = '';
+        generationState = 'failed';
+      }
+      renderGenerationState();
+    }
+
+    function downloadQRCode() {
+      generateCanvasEl.toBlob(blob => {
+        if (!blob) {
+          generationState = 'failed';
+          renderGenerationState();
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'qrcode.png';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+        generationState = 'downloaded';
+        renderGenerationState();
+      }, 'image/png');
+    }
+
+    function decodeImage(img) {
+      const SIZE = 200;
+      decodeCanvasEl.hidden = false;
+      decodeCanvasEl.width = SIZE;
+      decodeCanvasEl.height = SIZE;
+      decodeCtxEl.clearRect(0, 0, SIZE, SIZE);
+      decodeCtxEl.drawImage(img, 0, 0, SIZE, SIZE);
+      const data = decodeCtxEl.getImageData(0, 0, SIZE, SIZE);
+      const code = jsQR(data.data, data.width, data.height);
+      decodedState = code ? 'success' : 'notFound';
+      decodedData = code?.data || '';
+      renderDecodedResult();
+    }
+
+    function handleFile(file) {
+      const reader = new FileReader();
+      reader.onload = event => {
+        const image = new Image();
+        image.onload = () => decodeImage(image);
+        image.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleDataURL(url) {
+      const image = new Image();
+      image.onload = () => decodeImage(image);
+      image.src = url;
+    }
+
+    langBtnEl.addEventListener('click', () => setLanguage(lang === 'ja' ? 'en' : 'ja'));
+    generateBtnEl.addEventListener('click', generateQRCode);
+    downloadBtnEl.addEventListener('click', downloadQRCode);
+    textInputEl.addEventListener('keydown', event => {
+      if (event.key === 'Enter') generateQRCode();
+    });
+    textInputEl.addEventListener('input', () => {
+      if (generationState !== 'empty') {
+        generatedText = '';
+        generationState = 'empty';
+        generateCtxEl.clearRect(0, 0, generateCanvasEl.width, generateCanvasEl.height);
+        renderGenerationState();
+      }
+    });
+    generateCanvasEl.addEventListener('dragstart', event => {
+      event.dataTransfer.setData('text/plain', generateCanvasEl.toDataURL());
+    });
+    dropZoneEl.addEventListener('dragover', event => {
+      event.preventDefault();
+      dropZoneEl.classList.add('hover');
+    });
+    dropZoneEl.addEventListener('dragleave', () => dropZoneEl.classList.remove('hover'));
+    dropZoneEl.addEventListener('drop', event => {
+      event.preventDefault();
+      dropZoneEl.classList.remove('hover');
+      const transfer = event.dataTransfer;
+      if (transfer.files?.length) {
+        handleFile(transfer.files[0]);
+      } else {
+        const url = transfer.getData('text/plain');
+        if (url.startsWith('data:image')) {
+          handleDataURL(url);
+        } else {
+          decodedState = 'notFound';
+          decodedData = '';
+          renderDecodedResult();
+        }
+      }
+    });
+    decodeBtnEl.addEventListener('click', () => fileInputEl.click());
+    fileInputEl.addEventListener('change', () => {
+      if (fileInputEl.files.length) handleFile(fileInputEl.files[0]);
+    });
+    resetBtnEl.addEventListener('click', () => {
+      textInputEl.value = '';
+      generatedText = '';
+      generationState = 'empty';
+      generateCtxEl.clearRect(0, 0, generateCanvasEl.width, generateCanvasEl.height);
+      decodeCanvasEl.hidden = true;
+      decodeCtxEl.clearRect(0, 0, decodeCanvasEl.width, decodeCanvasEl.height);
+      decodedState = 'empty';
+      decodedData = '';
+      fileInputEl.value = null;
+      renderGenerationState();
+      renderDecodedResult();
+    });
+    setLanguage(lang);
   </script>
 </body>
 </html>

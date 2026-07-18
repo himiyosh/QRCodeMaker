@@ -5,15 +5,20 @@ This project is a web-based application for generating and decoding QR codes. Us
 ## Features
 
 - **QR Code Generation**: Input text to generate a QR code.
+- **PNG Download**: Save a generated QR code directly from the browser.
 - **QR Code Decoding**: Upload or drag-and-drop an image to decode a QR code.
 - **Multi-language Support**: Supports both English and Japanese.
 - **Responsive Design**: Optimized for mobile and desktop devices.
+- **Local Processing**: QR text, generated images, and selected files stay in
+  the browser; the app does not upload them.
 
 ### QR Code Generation
 
 1. Enter text in the input field.
 2. Click the "Generate QR Code" button.
-3. The generated QR code will appear in the canvas. You can drag it to the decoding area.
+3. The generated QR code will appear in the preview. Leading and trailing
+   whitespace is encoded exactly as entered.
+4. Select "Save PNG" to download it, or drag it to the decoding area.
 
 ### QR Code Decoding
 
@@ -27,9 +32,19 @@ This project is a web-based application for generating and decoding QR codes. Us
 QRCodeMaker/
 ├── index.html
 ├── README.md
+├── tests/
+│   └── qrcode-ui-contract.test.mjs
 └── .github/
     ├── agents/QRCodeMakerAgent.agent.md
     └── skills/hallmark/
+```
+
+## Testing
+
+Run the dependency-free UI contract checks with:
+
+```sh
+node --test tests/qrcode-ui-contract.test.mjs
 ```
 
 ## Copilot customization
