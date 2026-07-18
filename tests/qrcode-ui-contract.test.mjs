@@ -23,6 +23,12 @@ test('the generation form exposes labelled and announced states', () => {
   assert.doesNotMatch(html, /\balert\(/);
 });
 
+test('empty output controls stay hidden until generation succeeds', () => {
+  assert.match(html, /id="download-btn"[^>]+hidden/);
+  assert.match(html, /<canvas id="generate-canvas" hidden/);
+  assert.match(html, /#result:empty \{ display: none; \}/);
+});
+
 test('PNG download is generated locally from the canvas', () => {
   assert.match(html, /id="download-btn"/);
   assert.match(html, /generateCanvasEl\.toBlob\(/);
