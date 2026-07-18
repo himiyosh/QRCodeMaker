@@ -22,15 +22,18 @@ This project is a web-based application for generating and decoding QR codes. Us
 
 ### QR Code Decoding
 
-1. Drag and drop an image into the "Drag & drop an image here" area.
-2. Alternatively, click the "Or select a file" button to upload an image.
+1. Drag and drop an image into the "Drop an image here" area.
+2. Alternatively, select "Choose an image" to open the native file picker.
 3. The decoded result will be displayed below.
+4. Unsupported, unreadable, or damaged files receive inline guidance in the
+   selected language; the image still stays in the browser.
 
 ## Project Structure
 
 ```
 QRCodeMaker/
 ├── index.html
+├── PRODUCT.md
 ├── README.md
 ├── tests/
 │   └── qrcode-ui-contract.test.mjs

@@ -197,21 +197,84 @@
       color: #fff; /* 読みやすい白文字 */
     }
     #result:empty { display: none; }
+    #result[data-state="invalidFile"],
+    #result[data-state="readFailed"],
+    #result[data-state="imageFailed"] {
+      border: 1px solid #ffb3b3;
+      background-color: rgba(120,20,20,0.35);
+      color: #ffe3e3;
+    }
     #drop-zone {
+      display: flex;
+      min-height: 132px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 0.5rem;
       border: 2px dashed #6fc3df;
       border-radius: 8px;
       padding: 2rem;
       margin: 0.5rem auto;
       color: #6fc3df;
-      transition: border-color 0.3s, color 0.3s;
+      transition: border-color 180ms, color 180ms, background-color 180ms;
       background: rgba(111,195,223,0.05);
       width: 80%;
       box-sizing: border-box;
+      cursor: pointer;
     }
-    #drop-zone.hover { border-color: #fff; color: #fff; }
+    #drop-zone.hover,
+    #drop-zone:focus-within {
+      border-color: #fff;
+      color: #fff;
+    }
+    #drop-zone:focus-within {
+      outline: 3px solid #8ed5e6;
+      outline-offset: 3px;
+    }
+    #drop-zone:active {
+      background: rgba(111,195,223,0.12);
+    }
+    #drop-zone:has(input:disabled) {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    #drop-zone[data-state="loading"] {
+      border-style: solid;
+      cursor: progress;
+    }
+    #drop-zone[data-state="error"] {
+      border-color: #ffb3b3;
+    }
+    #drop-zone[data-state="success"] {
+      border-style: solid;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      #drop-zone:hover {
+        border-color: #fff;
+        color: #fff;
+      }
+    }
+    .drop-zone-action {
+      color: #e0f7fa;
+      font-weight: bold;
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
     @media (prefers-reduced-motion: reduce) {
       button.action { transition: none; }
       button.action:active { transform: none; }
+      #drop-zone { transition: none; }
     }
   </style>
 </head>
@@ -241,10 +304,12 @@
 
     <div class="section" id="decode">
       <h2 id="dec-title">解読</h2>
-      <div id="drop-zone">ここに画像をドラッグ＆ドロップ</div>
-      <input id="file-input" type="file" accept="image/*" style="display:none;">
-      <div>
-        <button id="decode-btn" class="action">またはファイル選択</button>
+      <label id="drop-zone" for="file-input" data-state="empty" aria-busy="false">
+        <span id="drop-zone-text">ここに画像をドロップ</span>
+        <span id="drop-zone-action" class="drop-zone-action" aria-hidden="true">画像を選択</span>
+        <input id="file-input" class="visually-hidden" type="file" accept="image/*" aria-describedby="result">
+      </label>
+      <div class="button-row">
         <button id="reset-btn" class="action">リセット</button>
       </div>
       <canvas id="decode-canvas" hidden width="200" height="200" aria-label="解読に使用した画像"></canvas>
@@ -275,11 +340,15 @@
         downloadBtn: 'PNGを保存',
         downloaded: 'QRコードをPNGで保存しました',
         hint: '生成したQRコードをドラッグして解読エリアにドロップできます',
-        dropZone: 'ここに画像をドラッグ＆ドロップ',
-        fileBtn: 'またはファイル選択',
+        dropZone: 'ここに画像をドロップ',
+        fileBtn: '画像を選択',
         resetBtn: 'リセット',
+        decoding: '画像を読み込んでいます…',
         decoded: '解読結果: ',
-        notFound: 'QRコードが見つかりませんでした',
+        notFound: 'QRコードが見つかりませんでした。QRコード全体が写った鮮明な画像を選択してください。',
+        invalidFile: '画像ファイルではありません。PNG、JPEG、GIF、WebPなどの画像を選択してください。',
+        readFailed: '画像ファイルを読み込めませんでした。別の画像を選択してください。',
+        imageFailed: 'この画像を開けませんでした。別の画像ファイルを選択してください。',
         switchLanguage: 'Switch to English'
       },
       en: {
@@ -300,11 +369,15 @@
         downloadBtn: 'Save PNG',
         downloaded: 'QR code saved as a PNG',
         hint: 'Drag the generated QR code here to decode it',
-        dropZone: 'Drag & drop an image here',
-        fileBtn: 'Or select a file',
+        dropZone: 'Drop an image here',
+        fileBtn: 'Choose an image',
         resetBtn: 'Reset',
+        decoding: 'Reading the image…',
         decoded: 'Decoded: ',
-        notFound: 'QR code not found',
+        notFound: 'No QR code was found. Choose a clear image that shows the complete QR code.',
+        invalidFile: 'That file is not an image. Choose a PNG, JPEG, GIF, WebP, or another image file.',
+        readFailed: 'The image file could not be read. Choose another image.',
+        imageFailed: 'The image could not be opened. Choose another image file.',
         switchLanguage: '日本語に切り替える'
       }
     };
@@ -313,6 +386,7 @@
     let generatedText = '';
     let decodedState = 'empty';
     let decodedData = '';
+    let decodeRequestId = 0;
 
     // QR生成と解読
     const langBtnEl = document.getElementById('lang-btn');
@@ -327,12 +401,13 @@
     const generateCanvasEl = document.getElementById('generate-canvas');
     const generateCtxEl = generateCanvasEl.getContext('2d', { willReadFrequently: true });
     const fileInputEl = document.getElementById('file-input');
-    const decodeBtnEl = document.getElementById('decode-btn');
     const resetBtnEl = document.getElementById('reset-btn');
     const decodeCanvasEl = document.getElementById('decode-canvas');
     const decodeCtxEl = decodeCanvasEl.getContext('2d', { willReadFrequently: true });
     const resultPEl = document.getElementById('result');
     const dropZoneEl = document.getElementById('drop-zone');
+    const dropZoneTextEl = document.getElementById('drop-zone-text');
+    const dropZoneActionEl = document.getElementById('drop-zone-action');
 
     function renderGenerationState() {
       const t = texts[lang];
@@ -366,12 +441,24 @@
     function renderDecodedResult() {
       if (decodedState === 'success') {
         resultPEl.textContent = texts[lang].decoded + decodedData;
+      } else if (decodedState === 'loading') {
+        resultPEl.textContent = texts[lang].decoding;
       } else if (decodedState === 'notFound') {
         resultPEl.textContent = texts[lang].notFound;
+      } else if (decodedState === 'invalidFile') {
+        resultPEl.textContent = texts[lang].invalidFile;
+      } else if (decodedState === 'readFailed') {
+        resultPEl.textContent = texts[lang].readFailed;
+      } else if (decodedState === 'imageFailed') {
+        resultPEl.textContent = texts[lang].imageFailed;
       } else {
         resultPEl.textContent = '';
       }
       resultPEl.dataset.state = decodedState;
+      dropZoneEl.dataset.state = ['notFound', 'invalidFile', 'readFailed', 'imageFailed'].includes(decodedState)
+        ? 'error'
+        : decodedState;
+      dropZoneEl.setAttribute('aria-busy', decodedState === 'loading' ? 'true' : 'false');
     }
 
     function setLanguage(newLang) {
@@ -390,8 +477,9 @@
       decodeCanvasEl.setAttribute('aria-label', t.decodeCanvasLabel);
       downloadBtnEl.textContent = t.downloadBtn;
       document.getElementById('hint').textContent = t.hint;
-      dropZoneEl.textContent = t.dropZone;
-      decodeBtnEl.textContent = t.fileBtn;
+      dropZoneTextEl.textContent = t.dropZone;
+      dropZoneActionEl.textContent = t.fileBtn;
+      fileInputEl.setAttribute('aria-label', t.fileBtn);
       resetBtnEl.textContent = t.resetBtn;
       langBtnEl.textContent = lang === 'ja' ? 'EN' : 'JA';
       langBtnEl.setAttribute('aria-label', t.switchLanguage);
@@ -447,9 +535,35 @@
       }, 'image/png');
     }
 
-    function decodeImage(img) {
+    function clearDecodeCanvas() {
+      decodeCanvasEl.hidden = true;
+      decodeCtxEl.clearRect(0, 0, decodeCanvasEl.width, decodeCanvasEl.height);
+    }
+
+    function beginDecode() {
+      const requestId = ++decodeRequestId;
+      clearDecodeCanvas();
+      decodedState = 'loading';
+      decodedData = '';
+      renderDecodedResult();
+      return requestId;
+    }
+
+    function finishDecode(requestId, state, data = '') {
+      if (requestId !== decodeRequestId) return;
+      decodedState = state;
+      decodedData = data;
+      renderDecodedResult();
+    }
+
+    function decodeImage(img, requestId) {
+      if (requestId !== decodeRequestId) return;
       const sourceWidth = img.naturalWidth || img.width;
       const sourceHeight = img.naturalHeight || img.height;
+      if (!sourceWidth || !sourceHeight) {
+        finishDecode(requestId, 'imageFailed');
+        return;
+      }
       const maxDecodeSize = 1600;
       const scale = Math.min(1, maxDecodeSize / sourceWidth, maxDecodeSize / sourceHeight);
       const width = Math.max(1, Math.round(sourceWidth * scale));
@@ -461,25 +575,42 @@
       decodeCtxEl.drawImage(img, 0, 0, width, height);
       const data = decodeCtxEl.getImageData(0, 0, width, height);
       const code = jsQR(data.data, data.width, data.height);
-      decodedState = code ? 'success' : 'notFound';
-      decodedData = code?.data || '';
-      renderDecodedResult();
+      finishDecode(requestId, code ? 'success' : 'notFound', code?.data || '');
+    }
+
+    function loadImageSource(source, requestId) {
+      const image = new Image();
+      image.onload = () => decodeImage(image, requestId);
+      image.onerror = () => finishDecode(requestId, 'imageFailed');
+      image.src = source;
     }
 
     function handleFile(file) {
+      const requestId = beginDecode();
+      if (file.type && !file.type.startsWith('image/')) {
+        finishDecode(requestId, 'invalidFile');
+        return;
+      }
       const reader = new FileReader();
       reader.onload = event => {
-        const image = new Image();
-        image.onload = () => decodeImage(image);
-        image.src = event.target.result;
+        if (typeof event.target?.result !== 'string') {
+          finishDecode(requestId, 'readFailed');
+          return;
+        }
+        loadImageSource(event.target.result, requestId);
       };
+      reader.onerror = () => finishDecode(requestId, 'readFailed');
+      reader.onabort = () => finishDecode(requestId, 'readFailed');
       reader.readAsDataURL(file);
     }
 
     function handleDataURL(url) {
-      const image = new Image();
-      image.onload = () => decodeImage(image);
-      image.src = url;
+      const requestId = beginDecode();
+      if (!url.startsWith('data:image/')) {
+        finishDecode(requestId, 'invalidFile');
+        return;
+      }
+      loadImageSource(url, requestId);
     }
 
     langBtnEl.addEventListener('click', () => setLanguage(lang === 'ja' ? 'en' : 'ja'));
@@ -511,30 +642,24 @@
       if (transfer.files?.length) {
         handleFile(transfer.files[0]);
       } else {
-        const url = transfer.getData('text/plain');
-        if (url.startsWith('data:image')) {
-          handleDataURL(url);
-        } else {
-          decodedState = 'notFound';
-          decodedData = '';
-          renderDecodedResult();
-        }
+        handleDataURL(transfer.getData('text/plain'));
       }
     });
-    decodeBtnEl.addEventListener('click', () => fileInputEl.click());
     fileInputEl.addEventListener('change', () => {
-      if (fileInputEl.files.length) handleFile(fileInputEl.files[0]);
+      const file = fileInputEl.files[0];
+      fileInputEl.value = '';
+      if (file) handleFile(file);
     });
     resetBtnEl.addEventListener('click', () => {
+      decodeRequestId += 1;
       textInputEl.value = '';
       generatedText = '';
       generationState = 'empty';
       generateCtxEl.clearRect(0, 0, generateCanvasEl.width, generateCanvasEl.height);
-      decodeCanvasEl.hidden = true;
-      decodeCtxEl.clearRect(0, 0, decodeCanvasEl.width, decodeCanvasEl.height);
+      clearDecodeCanvas();
       decodedState = 'empty';
       decodedData = '';
-      fileInputEl.value = null;
+      fileInputEl.value = '';
       renderGenerationState();
       renderDecodedResult();
     });

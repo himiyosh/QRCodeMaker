@@ -38,6 +38,37 @@ test('decoding preserves source aspect ratio and caps oversized images', () => {
   assert.doesNotMatch(html, /const SIZE = 200;/);
 });
 
+test('the decoder exposes one semantic, keyboard-operable file surface', () => {
+  assert.match(html, /<label id="drop-zone" for="file-input"[^>]*>[\s\S]*<input id="file-input" class="visually-hidden"/);
+  assert.match(html, /id="file-input"[^>]+accept="image\/\*"[^>]+aria-describedby="result"/);
+  assert.match(html, /#drop-zone:focus-within/);
+  assert.match(html, /#drop-zone:hover/);
+  assert.match(html, /#drop-zone:active/);
+  assert.match(html, /#drop-zone:has\(input:disabled\)/);
+  assert.match(html, /#drop-zone\[data-state="loading"\]/);
+  assert.match(html, /#drop-zone\[data-state="error"\]/);
+  assert.match(html, /#drop-zone\[data-state="success"\]/);
+  assert.doesNotMatch(html, /id="file-input"[^>]+style="display:none;"/);
+  assert.doesNotMatch(html, /id="decode-btn"/);
+});
+
+test('decoder file failures are explicit, localized, and announced', () => {
+  assert.match(html, /file\.type && !file\.type\.startsWith\('image\/'\)/);
+  assert.match(html, /reader\.onerror = \(\) => finishDecode\(requestId, 'readFailed'\)/);
+  assert.match(html, /reader\.onabort = \(\) => finishDecode\(requestId, 'readFailed'\)/);
+  assert.match(html, /image\.onerror = \(\) => finishDecode\(requestId, 'imageFailed'\)/);
+  assert.match(html, /decodedState === 'loading'/);
+  assert.match(html, /dropZoneEl\.setAttribute\('aria-busy'/);
+  assert.match(html, /id="result" role="status" aria-live="polite"/);
+});
+
+test('new decoder requests supersede stale reads and allow retrying the same file', () => {
+  assert.match(html, /let decodeRequestId = 0;/);
+  assert.match(html, /const requestId = \+\+decodeRequestId;/);
+  assert.match(html, /if \(requestId !== decodeRequestId\) return;/);
+  assert.match(html, /fileInputEl\.value = '';/);
+});
+
 test('document and decoded-result semantics stay synchronized', () => {
   assert.match(html, /<main class="container">[\s\S]*id="decode"[\s\S]*<\/main>/);
   assert.match(html, /document\.documentElement\.lang = lang;/);
@@ -73,6 +104,21 @@ test('Japanese and English generation copy stay in sync', () => {
     'decodeCanvasLabel',
     'downloadBtn',
     'downloaded',
+  ]) {
+    assert.equal((html.match(new RegExp(`${key}:`, 'g')) || []).length, 2, key);
+  }
+});
+
+test('Japanese and English decoder copy stay in sync', () => {
+  for (const key of [
+    'dropZone',
+    'fileBtn',
+    'decoding',
+    'decoded',
+    'notFound',
+    'invalidFile',
+    'readFailed',
+    'imageFailed',
   ]) {
     assert.equal((html.match(new RegExp(`${key}:`, 'g')) || []).length, 2, key);
   }
