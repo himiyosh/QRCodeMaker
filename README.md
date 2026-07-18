@@ -25,12 +25,24 @@ This project is a web-based application for generating and decoding QR codes. Us
 
 ```
 QRCodeMaker/
-├── Index.html
+├── index.html
 ├── README.md
-└── assets/ (if applicable, for images or additional resources)
+└── .github/
+    ├── agents/QRCodeMakerAgent.agent.md
+    └── skills/hallmark/
 ```
+
+## Copilot customization
+
+Select `QRCodeMakerAgent` in GitHub Copilot to invoke the project's primary
+agent. UI improvement, read-only audit, explicit redesign, and design study
+requests are routed through the vendored Hallmark 1.1.0 skill while QR
+correctness, local processing, accessibility, i18n, and repository rules remain
+authoritative.
 
 ## Acknowledgments
 
 - QR code generation is powered by [QRCode.js](https://github.com/soldair/node-qrcode).
 - QR code decoding is powered by [jsQR](https://github.com/cozmo/jsQR).
+- UI design workflows use [Hallmark](https://github.com/nutlope/hallmark),
+  vendored under its MIT license.
