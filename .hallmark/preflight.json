@@ -1,0 +1,14 @@
+{
+  "scannedAt": "2026-07-18",
+  "framework": "vanilla HTML",
+  "fontStack": "system sans-serif",
+  "palette": "dark blue with cyan accent",
+  "motion": "custom requestAnimationFrame background; no motion library",
+  "spacing": "rem-based without tokens",
+  "preserve": [
+    "static-site architecture",
+    "dark blue/cyan palette",
+    "local QR processing",
+    "Japanese and English content"
+  ]
+}
