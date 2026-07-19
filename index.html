@@ -3,232 +3,840 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src https://cdn.jsdelivr.net 'sha256-/vpkccFd1VSJ/m+zg7l6elpfmYs3E1ISUzlbDiC6lnE='; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="テキストからQRコードを作成し、画像内のQRコードを解読できる、ブラウザー内完結の無料ツールです。">
+  <meta name="theme-color" content="#090d14">
+  <link rel="icon" href="data:,">
   <title>QRコード作成・解読ツール</title>
   <style>
-    /* 背景用キャンバス */
-    #bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
-    /* 全体スタイル */
+    :root {
+      color-scheme: dark;
+      --page: #090d14;
+      --surface: #121923;
+      --surface-raised: #18212d;
+      --field: #0d131b;
+      --border: #35485a;
+      --border-strong: #6fc3df;
+      --text: #f5f8fa;
+      --muted: #b9c7d3;
+      --accent: #78cae5;
+      --accent-hover: #9bdced;
+      --accent-ink: #062b36;
+      --danger: #ffbcbc;
+      --danger-surface: #331c22;
+    }
     body {
       margin: 0;
-      padding: 0;
-      font-family: sans-serif;
+      padding: 1.5rem 1rem;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       min-height: 100vh;
+      color: var(--text);
+      background: var(--page);
+      box-sizing: border-box;
+      line-height: 1.5;
+    }
+    .container {
+      width: min(100%, 680px);
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+    #lang-switch {
       display: flex;
+      justify-content: flex-end;
+    }
+    #lang-btn {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--accent);
+      background: transparent;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+    }
+    #lang-btn:hover {
+      border-color: var(--border-strong);
+      background: var(--surface);
+    }
+    .page-header {
+      margin: 0.75rem 0 2rem;
+      text-align: left;
+    }
+    h1 {
+      margin: 0;
+      font-size: 2rem;
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+      text-wrap: balance;
+    }
+    .privacy-note {
+      max-width: 62ch;
+      margin: 0.75rem 0 0;
+      color: var(--muted);
+      font-size: 1rem;
+      text-wrap: pretty;
+    }
+    .section {
+      margin-bottom: 1rem;
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      text-align: center;
+    }
+    h2 {
+      margin: 0 0 1rem;
+      font-size: 1.35rem;
+      line-height: 1.3;
+      text-wrap: balance;
+    }
+    .field {
+      width: 100%;
+      margin: 0.75rem auto 1rem;
+      text-align: left;
+    }
+    .field-label {
+      display: block;
+      margin-bottom: 0.375rem;
+      color: var(--text);
+      font-weight: 700;
+    }
+    textarea {
+      width: 100%;
+      min-height: 7rem;
+      padding: 0.625rem 0.75rem;
+      margin: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--field);
+      color: var(--text);
+      box-sizing: border-box;
+      font: inherit;
+      line-height: 1.5;
+      resize: vertical;
+    }
+    textarea::placeholder {
+      color: #aebbc7;
+      opacity: 1;
+    }
+    textarea[aria-invalid="true"] {
+      border-color: var(--danger);
+    }
+    .helper {
+      min-height: 1.4em;
+      margin: 0.375rem 0 0;
+      color: var(--muted);
+      font-size: 0.9375rem;
+      line-height: 1.4;
+    }
+    .helper[data-state="error"],
+    .helper[data-state="failed"],
+    .helper[data-state="unavailable"] {
+      color: var(--danger);
+    }
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: center;
-      color: #fff;
-      overflow: auto;
-      background: #0a0a1e;
-    }
-    /* コンテナ */
-    .container {
-      background-color: rgba(0,0,0,0.8);
-      border: 2px solid rgba(111,195,223,0.5);
-      border-radius: 12px;
-      box-shadow: 0 0 20px rgba(111,195,223,0.4);
-      padding: 2rem;
-      max-width: 600px;
-      width: 90%;
-      box-sizing: border-box;
-      text-align: center;
-      margin: 1rem;
-    }
-    /* 各セクション枠 */
-    .section {
-      border: 1px solid #6fc3df;
-      border-radius: 8px;
-      padding: 1rem;
-      margin-bottom: 2rem;
-    }
-    /* モバイル対応 */
-    @media (max-width: 480px) {
-      .container { padding: 1rem; }
-      input[type=text] { padding: 0.4rem; }
-      button.action { padding: 0.4rem 0.8rem; font-size: 0.9rem; }
-    }
-    #lang-switch { text-align: right; margin-bottom: 1rem; }
-    #lang-btn {
-      background: none;
-      border: 1px solid #6fc3df;
-      color: #6fc3df;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    #lang-btn:hover { background-color: rgba(111,195,223,0.2); }
-    h1 { margin: 0.5rem 0; }
-    input[type=text] {
-      width: 100%;
-      padding: 0.5rem;
-      margin: 0.5rem auto;
-      border: 1px solid #6fc3df;
-      border-radius: 4px;
-      background: #222;
-      color: #e0f7fa;
-      box-sizing: border-box;
+      gap: 0.5rem;
     }
     button.action {
       display: inline-block;
-      margin: 0.5rem 0.5rem;
-      padding: 0.5rem 1rem;
+      min-height: 44px;
+      margin: 0.25rem 0;
+      padding: 0.625rem 1rem;
       font-size: 1rem;
-      border: none;
-      border-radius: 4px;
+      font-family: inherit;
+      font-weight: 700;
+      border: 1px solid transparent;
+      border-radius: 8px;
       cursor: pointer;
-      background-color: #6fc3df;
-      color: #002f3e;
-      transition: background-color 0.3s, box-shadow 0.3s;
+      background-color: var(--accent);
+      color: var(--accent-ink);
+      white-space: nowrap;
+      transition: background-color 120ms, transform 120ms;
     }
     button.action:hover {
-      background-color: #8ed5e6;
-      box-shadow: 0 0 8px rgba(111,195,223,0.6);
+      background-color: var(--accent-hover);
     }
+    button.action:active { transform: translateY(1px); }
+    button.action:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    button.action.secondary {
+      border-color: var(--border);
+      background: transparent;
+      color: var(--accent);
+    }
+    button.action.secondary:hover {
+      border-color: var(--border-strong);
+      background: var(--surface-raised);
+    }
+    #lang-btn:focus-visible,
+    textarea:focus-visible {
+      outline: 3px solid var(--accent-hover);
+      outline-offset: 3px;
+    }
+    button.action:focus-visible {
+      outline: 3px solid var(--accent-hover);
+      outline-offset: 3px;
+    }
+    [hidden] { display: none !important; }
     canvas {
       display: block;
       margin: 1rem auto;
-      border: 1px solid #6fc3df;
-      border-radius: 4px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
       background: #000;
+      box-sizing: border-box;
       max-width: 100%;
       height: auto;
     }
-    #result {
-      text-align: center;
-      font-weight: bold;
-      white-space: pre-wrap;
-      overflow-wrap: break-word;
-      margin-top: 1rem;
-      background-color: rgba(255,235,59,0.2);
-      padding: 0.75rem;
-      border-radius: 6px;
-      font-size: 1.1rem;
-      color: #fff; /* 読みやすい白文字 */
-    }
-    #drop-zone {
-      border: 2px dashed #6fc3df;
+    .qr-preview {
+      display: grid;
+      width: min(100%, 256px);
+      aspect-ratio: 1;
+      margin: 1rem auto 0;
+      place-items: center;
+      border: 1px dashed var(--border-strong);
       border-radius: 8px;
-      padding: 2rem;
-      margin: 0.5rem auto;
-      color: #6fc3df;
-      transition: border-color 0.3s, color 0.3s;
-      background: rgba(111,195,223,0.05);
-      width: 80%;
+      background: var(--field);
       box-sizing: border-box;
     }
-    #drop-zone.hover { border-color: #fff; color: #fff; }
+    .qr-preview[data-state="ready"],
+    .qr-preview[data-state="downloaded"] {
+      border-style: solid;
+      background: #fff;
+    }
+    .qr-preview canvas {
+      width: 100%;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: #fff;
+    }
+    .preview-empty {
+      max-width: 18ch;
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    #generate-status { text-align: center; }
+    .workflow-hint {
+      margin: 1.25rem 0 0;
+      color: var(--muted);
+      font-size: 0.9375rem;
+    }
+    #result {
+      margin: 1rem 0 0;
+      padding: 0.875rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--surface-raised);
+      text-align: left;
+      font-weight: 600;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+    }
+    #result:empty { display: none; }
+    .decode-actions { margin-top: 1rem; }
+    #copy-status:empty {
+      min-height: 0;
+      margin: 0;
+    }
+    #result[data-state="notFound"],
+    #result[data-state="invalidFile"],
+    #result[data-state="fileTooLarge"],
+    #result[data-state="readFailed"],
+    #result[data-state="imageFailed"],
+    #result[data-state="decodeFailed"],
+    #result[data-state="unavailable"] {
+      border-color: var(--danger);
+      background-color: var(--danger-surface);
+      color: #ffe7e7;
+    }
+    #drop-zone {
+      display: flex;
+      width: 100%;
+      min-height: 144px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 0.5rem;
+      border: 1px dashed var(--border-strong);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 0.5rem 0;
+      color: var(--accent);
+      transition: border-color 180ms, color 180ms, background-color 180ms;
+      background: var(--field);
+      box-sizing: border-box;
+      cursor: pointer;
+    }
+    #drop-zone.hover,
+    #drop-zone:focus-within {
+      border-color: var(--accent-hover);
+      color: var(--text);
+    }
+    #drop-zone:focus-within {
+      outline: 3px solid var(--accent-hover);
+      outline-offset: 3px;
+    }
+    #drop-zone:active {
+      background: var(--surface-raised);
+    }
+    #drop-zone:has(input:disabled) {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    #drop-zone[data-state="loading"] {
+      border-style: solid;
+      cursor: progress;
+    }
+    #drop-zone[data-state="error"] {
+      border-color: var(--danger);
+    }
+    #drop-zone[data-state="success"] {
+      border-style: solid;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      #drop-zone:hover {
+        border-color: var(--accent-hover);
+        color: var(--text);
+      }
+    }
+    .drop-zone-action {
+      color: var(--text);
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (max-width: 480px) {
+      body { padding: 1rem 0.75rem; }
+      h1 { font-size: 1.625rem; }
+      .page-header { margin-bottom: 1.5rem; }
+      .section { padding: 1rem; }
+      .button-row { align-items: stretch; }
+      .button-row .action { width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      button.action { transition: none; }
+      button.action:active { transform: none; }
+      #drop-zone { transition: none; }
+    }
   </style>
 </head>
 <body>
-  <canvas id="bg-canvas"></canvas>
-  <div class="container">
+  <main class="container">
     <div id="lang-switch"><button id="lang-btn">EN</button></div>
-    <h1 id="title">QRコード作成・解読ツール</h1>
+    <header class="page-header">
+      <h1 id="title">QRコード作成・解読ツール</h1>
+      <p id="privacy-note" class="privacy-note">テキストと画像はこのブラウザー内だけで処理され、外部へ送信されません。</p>
+    </header>
 
-    <div class="section" id="generate">
+    <section class="section" id="generate" aria-labelledby="gen-title">
       <h2 id="gen-title">生成</h2>
-      <input id="text-input" type="text" placeholder="テキストを入力">
-      <button id="generate-btn" class="action">QRコードを生成</button>
-      <canvas id="generate-canvas" width="200" height="200" draggable="true"></canvas>
-      <p id="hint" style="font-size:0.9rem; color:#6fc3df;">生成したQRコードをドラッグして解読エリアにドロップできます</p>
-    </div>
-
-    <div class="section" id="decode">
-      <h2 id="dec-title">解読</h2>
-      <div id="drop-zone">ここに画像をドラッグ＆ドロップ</div>
-      <input id="file-input" type="file" accept="image/*" style="display:none;">
-      <div>
-        <button id="decode-btn" class="action">またはファイル選択</button>
-        <button id="reset-btn" class="action">リセット</button>
+      <div class="field">
+        <label id="text-label" class="field-label" for="text-input">QRコードにするテキスト</label>
+        <textarea id="text-input" rows="4" placeholder="例: https://example.com" aria-describedby="text-helper generate-status" aria-invalid="false"></textarea>
+        <p id="text-helper" class="helper">空白と改行を入力どおりに保存します。Ctrl/⌘ + Enterでも生成できます</p>
       </div>
-      <canvas id="decode-canvas" hidden width="200" height="200"></canvas>
-      <p id="result"></p>
-    </div>
-  </div>
+      <div class="button-row">
+        <button id="generate-btn" class="action">QRコードを生成</button>
+        <button id="download-btn" class="action secondary" hidden>PNGを保存</button>
+      </div>
+      <div id="generate-preview" class="qr-preview" data-state="empty">
+        <p id="preview-empty" class="preview-empty">生成したQRコードがここに表示されます</p>
+        <canvas id="generate-canvas" hidden width="256" height="256" draggable="true" aria-label="生成されたQRコード"></canvas>
+      </div>
+      <p id="generate-status" class="helper" role="status" aria-live="polite"></p>
+      <p id="hint" class="workflow-hint">生成したQRコードをドラッグして解読エリアにドロップできます</p>
+    </section>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+    <section class="section" id="decode" aria-labelledby="dec-title">
+      <h2 id="dec-title">解読</h2>
+      <label id="drop-zone" for="file-input" data-state="empty" aria-busy="false">
+        <span id="drop-zone-text">ここに画像をドロップ</span>
+        <span id="drop-zone-action" class="drop-zone-action" aria-hidden="true">画像を選択</span>
+        <input id="file-input" class="visually-hidden" type="file" accept="image/*" aria-describedby="result">
+      </label>
+      <canvas id="decode-canvas" hidden width="200" height="200" aria-label="解読に使用した画像"></canvas>
+      <p id="result" role="status" aria-live="polite" data-state="empty"></p>
+      <div id="decode-actions" class="button-row decode-actions" hidden>
+        <button id="copy-btn" class="action" hidden>結果をコピー</button>
+        <button id="reset-btn" class="action secondary" hidden>解読結果をクリア</button>
+      </div>
+      <p id="copy-status" class="helper" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"
+          integrity="sha384-HGmnkDZJy7mRkoARekrrj0VjEFSh9a0Z8qxGri/kTTAJkgR8hqD1lHsYSh3JdzRi"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"
+          integrity="sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script>
     // 多言語テキスト
     const texts = {
-      ja: { title: 'QRコード作成・解読ツール', genTitle: '生成', decTitle: '解読', inputPlaceholder: 'テキストを入力', generateBtn: 'QRコードを生成', hint: '生成したQRコードをドラッグして解読エリアにドロップできます', dropZone: 'ここに画像をドラッグ＆ドロップ', fileBtn: 'またはファイル選択', resetBtn: 'リセット', decoded: '解読結果: ', notFound: 'QRコードが見つかりませんでした' },
-      en: { title: 'QR Code Generator & Reader', genTitle: 'Generate', decTitle: 'Decode', inputPlaceholder: 'Enter text', generateBtn: 'Generate QR Code', hint: 'Drag the generated QR code here to decode', dropZone: 'Drag & drop an image here', fileBtn: 'Or select a file', resetBtn: 'Reset', decoded: 'Decoded: ', notFound: 'QR code not found' }
+      ja: {
+        title: 'QRコード作成・解読ツール',
+        description: 'テキストからQRコードを作成し、画像内のQRコードを解読できる、ブラウザー内完結の無料ツールです。',
+        privacyNote: 'テキストと画像はこのブラウザー内だけで処理され、外部へ送信されません。',
+        genTitle: '生成',
+        decTitle: '解読',
+        inputLabel: 'QRコードにするテキスト',
+        inputPlaceholder: '例: https://example.com',
+        inputHelper: '空白と改行を入力どおりに保存します。Ctrl/⌘ + Enterでも生成できます',
+        inputRequired: 'テキストが空です。QRコードにする内容を入力してください。',
+        generateBtn: 'QRコードを生成',
+        generating: '生成中…',
+        generated: count => `QRコードを生成しました（${count}文字）`,
+        generationFailed: 'QRコードを生成できませんでした。入力を短くして、もう一度お試しください。',
+        generationUnavailable: 'QRコード生成機能を読み込めませんでした。接続を確認してページを再読み込みしてください。',
+        previewEmpty: '生成したQRコードがここに表示されます',
+        previewLabel: '生成されたQRコード',
+        decodeCanvasLabel: '解読に使用した画像',
+        downloadBtn: 'PNGを保存',
+        downloaded: 'QRコードをPNGで保存しました',
+        hint: '生成したQRコードをドラッグして解読エリアにドロップできます',
+        dropZone: 'ここに画像をドロップ',
+        fileBtn: '画像を選択',
+        copyBtn: '結果をコピー',
+        copying: 'コピー中…',
+        copied: '解読結果をコピーしました',
+        copyFailed: 'コピーできませんでした。結果を選択して手動でコピーしてください。',
+        clearDecodeBtn: '解読結果をクリア',
+        decoding: '画像を読み込んでいます…',
+        decoded: '解読結果: ',
+        notFound: 'QRコードが見つかりませんでした。QRコード全体が写った鮮明な画像を選択してください。',
+        invalidFile: '画像ファイルではありません。PNG、JPEG、GIF、WebPなどの画像を選択してください。',
+        fileTooLarge: '画像が大きすぎます。20 MB以下の画像を選択してください。',
+        readFailed: '画像ファイルを読み込めませんでした。別の画像を選択してください。',
+        imageFailed: 'この画像を開けませんでした。別の画像ファイルを選択してください。',
+        decodeFailed: 'この画像を処理できませんでした。別の画像ファイルを選択してください。',
+        decodeUnavailable: 'QRコード解読機能を読み込めませんでした。接続を確認してページを再読み込みしてください。',
+        switchLanguage: 'Switch to English'
+      },
+      en: {
+        title: 'QR Code Generator & Reader',
+        description: 'Create QR codes from text and decode QR codes from images entirely in your browser.',
+        privacyNote: 'Text and images are processed only in this browser and are never sent elsewhere.',
+        genTitle: 'Generate',
+        decTitle: 'Decode',
+        inputLabel: 'Text to encode',
+        inputPlaceholder: 'Example: https://example.com',
+        inputHelper: 'Spaces and line breaks are preserved exactly. Press Ctrl/⌘ + Enter to generate.',
+        inputRequired: 'The text is empty. Enter the content to encode.',
+        generateBtn: 'Generate QR Code',
+        generating: 'Generating…',
+        generated: count => `QR code ready (${count} characters)`,
+        generationFailed: 'The QR code could not be generated. Shorten the input and try again.',
+        generationUnavailable: 'The QR generator could not be loaded. Check your connection and reload the page.',
+        previewEmpty: 'Your generated QR code will appear here',
+        previewLabel: 'Generated QR code',
+        decodeCanvasLabel: 'Image used for decoding',
+        downloadBtn: 'Save PNG',
+        downloaded: 'QR code saved as a PNG',
+        hint: 'Drag the generated QR code here to decode it',
+        dropZone: 'Drop an image here',
+        fileBtn: 'Choose an image',
+        copyBtn: 'Copy result',
+        copying: 'Copying…',
+        copied: 'Decoded result copied',
+        copyFailed: 'The result could not be copied. Select it and copy it manually.',
+        clearDecodeBtn: 'Clear decoded result',
+        decoding: 'Reading the image…',
+        decoded: 'Decoded: ',
+        notFound: 'No QR code was found. Choose a clear image that shows the complete QR code.',
+        invalidFile: 'That file is not an image. Choose a PNG, JPEG, GIF, WebP, or another image file.',
+        fileTooLarge: 'That image is too large. Choose an image no larger than 20 MB.',
+        readFailed: 'The image file could not be read. Choose another image.',
+        imageFailed: 'The image could not be opened. Choose another image file.',
+        decodeFailed: 'The image could not be processed. Choose another image file.',
+        decodeUnavailable: 'The QR reader could not be loaded. Check your connection and reload the page.',
+        switchLanguage: '日本語に切り替える'
+      }
     };
     let lang = 'ja';
-    const langBtn = document.getElementById('lang-btn');
-    function setLanguage(l) { lang = l; const t = texts[l]; document.getElementById('title').innerText = t.title; document.getElementById('gen-title').innerText = t.genTitle; document.getElementById('dec-title').innerText = t.decTitle; document.getElementById('text-input').placeholder = t.inputPlaceholder; document.getElementById('generate-btn').innerText = t.generateBtn; document.getElementById('hint').innerText = t.hint; document.getElementById('drop-zone').innerText = t.dropZone; document.getElementById('decode-btn').innerText = t.fileBtn; document.getElementById('reset-btn').innerText = t.resetBtn; }
-    langBtn.addEventListener('click', () => { const newLang = lang === 'ja' ? 'en' : 'ja'; setLanguage(newLang); langBtn.innerText = lang === 'ja' ? 'EN' : 'JA'; });
-    setLanguage(lang);
-
-    // 背景アニメーション（移動+回転）
-    const bgCanvas = document.getElementById('bg-canvas');
-    const bgCtx = bgCanvas.getContext('2d');
-    let W, H;
-    const NUM = 80;
-    let particles = [];
-    function resizeBg() { W = bgCanvas.width = window.innerWidth; H = bgCanvas.height = window.innerHeight; initParticles(); }
-    window.addEventListener('resize', resizeBg);
-    function initParticles() {
-      particles = [];
-      for (let i = 0; i < NUM; i++) {
-        particles.push({
-          x: Math.random()*W,
-          y: Math.random()*H,
-          side: 15+Math.random()*25,
-          angle: Math.random()*Math.PI*2,
-          speed: (Math.random()-0.5)*0.03,
-          vx: (Math.random()-0.5)*0.5,
-          vy: (Math.random()-0.5)*0.5
-        });
-      }
-    }
-    resizeBg();
-    function drawBg() {
-      bgCtx.fillStyle='rgba(10,10,30,1)'; bgCtx.fillRect(0,0,W,H);
-      particles.forEach(p=>{
-        p.angle+=p.speed;
-        p.x += p.vx;
-        p.y += p.vy;
-        if(p.x<0||p.x>W) p.vx *= -1;
-        if(p.y<0||p.y>H) p.vy *= -1;
-        const h=Math.sqrt(3)/2*p.side;
-        bgCtx.save();
-        bgCtx.translate(p.x,p.y);
-        bgCtx.rotate(p.angle);
-        bgCtx.beginPath();
-        bgCtx.moveTo(0,-2*h/3);
-        bgCtx.lineTo(-p.side/2,h/3);
-        bgCtx.lineTo(p.side/2,h/3);
-        bgCtx.closePath();
-        bgCtx.fillStyle='rgba(0,255,255,0.4)'; bgCtx.fill();
-        bgCtx.strokeStyle='rgba(0,255,255,0.8)'; bgCtx.lineWidth=1; bgCtx.stroke();
-        bgCtx.restore();
-      });
-      requestAnimationFrame(drawBg);
-    }
-    drawBg();
+    let generationState = 'empty';
+    let generatedText = '';
+    let decodedState = 'empty';
+    let decodedData = '';
+    let decodeRequestId = 0;
+    let copyState = 'idle';
+    let copyRequestId = 0;
+    const maxDecodeFileBytes = 20 * 1024 * 1024;
 
     // QR生成と解読
+    const langBtnEl = document.getElementById('lang-btn');
     const generateBtnEl = document.getElementById('generate-btn');
+    const downloadBtnEl = document.getElementById('download-btn');
     const textInputEl = document.getElementById('text-input');
+    const textLabelEl = document.getElementById('text-label');
+    const textHelperEl = document.getElementById('text-helper');
+    const generatePreviewEl = document.getElementById('generate-preview');
+    const previewEmptyEl = document.getElementById('preview-empty');
+    const generateStatusEl = document.getElementById('generate-status');
     const generateCanvasEl = document.getElementById('generate-canvas');
-    const generateCtxEl = generateCanvasEl.getContext('2d');
+    const generateCtxEl = generateCanvasEl.getContext('2d', { willReadFrequently: true });
     const fileInputEl = document.getElementById('file-input');
-    const decodeBtnEl = document.getElementById('decode-btn');
+    const decodeActionsEl = document.getElementById('decode-actions');
+    const copyBtnEl = document.getElementById('copy-btn');
+    const copyStatusEl = document.getElementById('copy-status');
     const resetBtnEl = document.getElementById('reset-btn');
     const decodeCanvasEl = document.getElementById('decode-canvas');
-    const decodeCtxEl = decodeCanvasEl.getContext('2d');
+    const decodeCtxEl = decodeCanvasEl.getContext('2d', { willReadFrequently: true });
     const resultPEl = document.getElementById('result');
     const dropZoneEl = document.getElementById('drop-zone');
-    generateCanvasEl.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain',generateCanvasEl.toDataURL()));
-    generateBtnEl.addEventListener('click',()=>{const txt=textInputEl.value.trim(); if(!txt){alert(texts[lang].inputPlaceholder);return;} QRCode.toCanvas(generateCanvasEl,txt,{width:200,margin:1});});
-    function decodeImage(img){const SIZE=200;decodeCanvasEl.hidden=false;decodeCanvasEl.width=SIZE;decodeCanvasEl.height=SIZE;decodeCtxEl.clearRect(0,0,SIZE,SIZE);decodeCtxEl.drawImage(img,0,0,SIZE,SIZE);const data=decodeCtxEl.getImageData(0,0,SIZE,SIZE);const code=jsQR(data.data,data.width,data.height);resultPEl.textContent=code?texts[lang].decoded+code.data:texts[lang].notFound;}
-    function handleFile(file){const rdr=new FileReader();rdr.onload=e=>{const img=new Image();img.onload=()=>decodeImage(img);img.src=e.target.result;};rdr.readAsDataURL(file);}
-    function handleDataURL(url){const img=new Image();img.onload=()=>decodeImage(img);img.src=url;}
-    dropZoneEl.addEventListener('dragover',e=>{e.preventDefault();dropZoneEl.classList.add('hover');});
-    dropZoneEl.addEventListener('dragleave',()=>dropZoneEl.classList.remove('hover'));
-    dropZoneEl.addEventListener('drop',e=>{e.preventDefault();dropZoneEl.classList.remove('hover');const dt=e.dataTransfer;if(dt.files&&dt.files.length)handleFile(dt.files[0]);else{const u=dt.getData('text/plain');if(u&&u.startsWith('data:image'))handleDataURL(u);else resultPEl.textContent=texts[lang].notFound;}});
-    decodeBtnEl.addEventListener('click',()=>fileInputEl.click());fileInputEl.addEventListener('change',()=>{if(fileInputEl.files.length)handleFile(fileInputEl.files[0]);});
-    resetBtnEl.addEventListener('click',()=>{textInputEl.value='';generateCtxEl.clearRect(0,0,generateCanvasEl.width,generateCanvasEl.height);decodeCanvasEl.hidden=true;decodeCtxEl.clearRect(0,0,decodeCanvasEl.width,decodeCanvasEl.height);resultPEl.textContent='';fileInputEl.value=null;});
+    const dropZoneTextEl = document.getElementById('drop-zone-text');
+    const dropZoneActionEl = document.getElementById('drop-zone-action');
+    const descriptionMetaEl = document.querySelector('meta[name="description"]');
+    const privacyNoteEl = document.getElementById('privacy-note');
+
+    function renderGenerationState() {
+      const t = texts[lang];
+      const hasPreview = generationState === 'ready' || generationState === 'downloaded';
+      generateBtnEl.disabled = generationState === 'generating';
+      generateBtnEl.textContent = generationState === 'generating' ? t.generating : t.generateBtn;
+      downloadBtnEl.hidden = !hasPreview;
+      generateCanvasEl.hidden = !hasPreview;
+      previewEmptyEl.hidden = hasPreview;
+      generatePreviewEl.dataset.state = generationState;
+      textInputEl.setAttribute('aria-invalid', generationState === 'error' ? 'true' : 'false');
+      textHelperEl.textContent = generationState === 'error' ? t.inputRequired : t.inputHelper;
+      textHelperEl.dataset.state = generationState === 'error' ? 'error' : '';
+      generateStatusEl.dataset.state = generationState;
+
+      if (generationState === 'error') {
+        generateStatusEl.textContent = '';
+      } else if (generationState === 'generating') {
+        generateStatusEl.textContent = t.generating;
+      } else if (generationState === 'ready') {
+        generateStatusEl.textContent = t.generated(Array.from(generatedText).length);
+      } else if (generationState === 'downloaded') {
+        generateStatusEl.textContent = t.downloaded;
+      } else if (generationState === 'failed') {
+        generateStatusEl.textContent = t.generationFailed;
+      } else if (generationState === 'unavailable') {
+        generateStatusEl.textContent = t.generationUnavailable;
+      } else {
+        generateStatusEl.textContent = '';
+      }
+    }
+
+    function renderDecodedResult() {
+      if (decodedState === 'success') {
+        resultPEl.textContent = texts[lang].decoded + decodedData;
+      } else if (decodedState === 'loading') {
+        resultPEl.textContent = texts[lang].decoding;
+      } else if (decodedState === 'notFound') {
+        resultPEl.textContent = texts[lang].notFound;
+      } else if (decodedState === 'invalidFile') {
+        resultPEl.textContent = texts[lang].invalidFile;
+      } else if (decodedState === 'fileTooLarge') {
+        resultPEl.textContent = texts[lang].fileTooLarge;
+      } else if (decodedState === 'readFailed') {
+        resultPEl.textContent = texts[lang].readFailed;
+      } else if (decodedState === 'imageFailed') {
+        resultPEl.textContent = texts[lang].imageFailed;
+      } else if (decodedState === 'decodeFailed') {
+        resultPEl.textContent = texts[lang].decodeFailed;
+      } else if (decodedState === 'unavailable') {
+        resultPEl.textContent = texts[lang].decodeUnavailable;
+      } else {
+        resultPEl.textContent = '';
+      }
+      resultPEl.dataset.state = decodedState;
+      decodeActionsEl.hidden = decodedState === 'empty';
+      copyBtnEl.hidden = decodedState !== 'success';
+      copyBtnEl.disabled = copyState === 'copying';
+      copyBtnEl.textContent = copyState === 'copying' ? texts[lang].copying : texts[lang].copyBtn;
+      copyStatusEl.dataset.state = copyState;
+      copyStatusEl.textContent = copyState === 'copied'
+        ? texts[lang].copied
+        : copyState === 'failed'
+          ? texts[lang].copyFailed
+          : '';
+      resetBtnEl.hidden = decodedState === 'empty';
+      resetBtnEl.disabled = decodedState === 'empty';
+      dropZoneEl.dataset.state = ['notFound', 'invalidFile', 'fileTooLarge', 'readFailed', 'imageFailed', 'decodeFailed', 'unavailable'].includes(decodedState)
+        ? 'error'
+        : decodedState;
+      dropZoneEl.setAttribute('aria-busy', decodedState === 'loading' ? 'true' : 'false');
+    }
+
+    function setLanguage(newLang) {
+      lang = newLang;
+      const t = texts[lang];
+      document.documentElement.lang = lang;
+      document.title = t.title;
+      descriptionMetaEl.content = t.description;
+      document.getElementById('title').textContent = t.title;
+      privacyNoteEl.textContent = t.privacyNote;
+      document.getElementById('gen-title').textContent = t.genTitle;
+      document.getElementById('dec-title').textContent = t.decTitle;
+      textLabelEl.textContent = t.inputLabel;
+      textInputEl.placeholder = t.inputPlaceholder;
+      textHelperEl.textContent = t.inputHelper;
+      previewEmptyEl.textContent = t.previewEmpty;
+      generateCanvasEl.setAttribute('aria-label', t.previewLabel);
+      decodeCanvasEl.setAttribute('aria-label', t.decodeCanvasLabel);
+      downloadBtnEl.textContent = t.downloadBtn;
+      document.getElementById('hint').textContent = t.hint;
+      dropZoneTextEl.textContent = t.dropZone;
+      dropZoneActionEl.textContent = t.fileBtn;
+      fileInputEl.setAttribute('aria-label', t.fileBtn);
+      copyBtnEl.textContent = t.copyBtn;
+      resetBtnEl.textContent = t.clearDecodeBtn;
+      langBtnEl.textContent = lang === 'ja' ? 'EN' : 'JA';
+      langBtnEl.setAttribute('aria-label', t.switchLanguage);
+      renderGenerationState();
+      renderDecodedResult();
+    }
+
+    async function generateQRCode() {
+      if (generationState === 'generating') return;
+      const text = textInputEl.value;
+      if (text.length === 0) {
+        generationState = 'error';
+        renderGenerationState();
+        textInputEl.focus();
+        return;
+      }
+      if (typeof QRCode === 'undefined' || typeof QRCode.toCanvas !== 'function') {
+        generationState = 'unavailable';
+        renderGenerationState();
+        return;
+      }
+
+      generationState = 'generating';
+      renderGenerationState();
+      try {
+        await new Promise((resolve, reject) => {
+          QRCode.toCanvas(
+            generateCanvasEl,
+            text,
+            { width: 256, margin: 4, errorCorrectionLevel: 'M' },
+            error => error ? reject(error) : resolve()
+          );
+        });
+        generatedText = text;
+        generationState = 'ready';
+      } catch (error) {
+        console.error('QR generation failed', error);
+        generatedText = '';
+        generationState = 'failed';
+      }
+      renderGenerationState();
+    }
+
+    function downloadQRCode() {
+      generateCanvasEl.toBlob(blob => {
+        if (!blob) {
+          generationState = 'failed';
+          renderGenerationState();
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'qrcode.png';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+        generationState = 'downloaded';
+        renderGenerationState();
+      }, 'image/png');
+    }
+
+    function clearDecodeCanvas() {
+      decodeCanvasEl.hidden = true;
+      decodeCtxEl.clearRect(0, 0, decodeCanvasEl.width, decodeCanvasEl.height);
+    }
+
+    function beginDecode() {
+      const requestId = ++decodeRequestId;
+      copyRequestId += 1;
+      copyState = 'idle';
+      clearDecodeCanvas();
+      decodedState = 'loading';
+      decodedData = '';
+      renderDecodedResult();
+      return requestId;
+    }
+
+    function finishDecode(requestId, state, data = '') {
+      if (requestId !== decodeRequestId) return;
+      decodedState = state;
+      decodedData = data;
+      renderDecodedResult();
+    }
+
+    function decodeImage(img, requestId) {
+      if (requestId !== decodeRequestId) return;
+      if (typeof jsQR !== 'function') {
+        finishDecode(requestId, 'unavailable');
+        return;
+      }
+      const sourceWidth = img.naturalWidth || img.width;
+      const sourceHeight = img.naturalHeight || img.height;
+      if (!sourceWidth || !sourceHeight) {
+        finishDecode(requestId, 'imageFailed');
+        return;
+      }
+      const maxDecodeSize = 1600;
+      const scale = Math.min(1, maxDecodeSize / sourceWidth, maxDecodeSize / sourceHeight);
+      const width = Math.max(1, Math.round(sourceWidth * scale));
+      const height = Math.max(1, Math.round(sourceHeight * scale));
+      try {
+        decodeCanvasEl.hidden = false;
+        decodeCanvasEl.width = width;
+        decodeCanvasEl.height = height;
+        decodeCtxEl.clearRect(0, 0, width, height);
+        decodeCtxEl.drawImage(img, 0, 0, width, height);
+        const data = decodeCtxEl.getImageData(0, 0, width, height);
+        const code = jsQR(data.data, data.width, data.height);
+        finishDecode(requestId, code ? 'success' : 'notFound', code?.data || '');
+      } catch (error) {
+        console.error('QR decoding failed', error);
+        finishDecode(requestId, 'decodeFailed');
+      }
+    }
+
+    function loadImageSource(source, requestId) {
+      const image = new Image();
+      image.onload = () => decodeImage(image, requestId);
+      image.onerror = () => finishDecode(requestId, 'imageFailed');
+      image.src = source;
+    }
+
+    function handleFile(file) {
+      const requestId = beginDecode();
+      if (file.type && !file.type.startsWith('image/')) {
+        finishDecode(requestId, 'invalidFile');
+        return;
+      }
+      if (file.size > maxDecodeFileBytes) {
+        finishDecode(requestId, 'fileTooLarge');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = event => {
+        if (typeof event.target?.result !== 'string') {
+          finishDecode(requestId, 'readFailed');
+          return;
+        }
+        loadImageSource(event.target.result, requestId);
+      };
+      reader.onerror = () => finishDecode(requestId, 'readFailed');
+      reader.onabort = () => finishDecode(requestId, 'readFailed');
+      reader.readAsDataURL(file);
+    }
+
+    function handleDataURL(url) {
+      const requestId = beginDecode();
+      if (!url.startsWith('data:image/')) {
+        finishDecode(requestId, 'invalidFile');
+        return;
+      }
+      loadImageSource(url, requestId);
+    }
+
+    async function copyDecodedResult() {
+      if (decodedState !== 'success') return;
+      const requestId = ++copyRequestId;
+      const data = decodedData;
+      copyState = 'copying';
+      renderDecodedResult();
+
+      if (typeof navigator.clipboard?.writeText !== 'function') {
+        copyState = 'failed';
+        renderDecodedResult();
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(data);
+        if (requestId !== copyRequestId || decodedState !== 'success' || decodedData !== data) return;
+        copyState = 'copied';
+      } catch (error) {
+        console.error('Copying decoded result failed', error);
+        if (requestId !== copyRequestId) return;
+        copyState = 'failed';
+      }
+      renderDecodedResult();
+    }
+
+    langBtnEl.addEventListener('click', () => setLanguage(lang === 'ja' ? 'en' : 'ja'));
+    generateBtnEl.addEventListener('click', generateQRCode);
+    downloadBtnEl.addEventListener('click', downloadQRCode);
+    textInputEl.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        generateQRCode();
+      }
+    });
+    textInputEl.addEventListener('input', () => {
+      if (generationState !== 'empty') {
+        generatedText = '';
+        generationState = 'empty';
+        generateCtxEl.clearRect(0, 0, generateCanvasEl.width, generateCanvasEl.height);
+        renderGenerationState();
+      }
+    });
+    generateCanvasEl.addEventListener('dragstart', event => {
+      event.dataTransfer.setData('text/plain', generateCanvasEl.toDataURL());
+    });
+    dropZoneEl.addEventListener('dragover', event => {
+      event.preventDefault();
+      dropZoneEl.classList.add('hover');
+    });
+    dropZoneEl.addEventListener('dragleave', () => dropZoneEl.classList.remove('hover'));
+    dropZoneEl.addEventListener('drop', event => {
+      event.preventDefault();
+      dropZoneEl.classList.remove('hover');
+      const transfer = event.dataTransfer;
+      if (transfer.files?.length) {
+        handleFile(transfer.files[0]);
+      } else {
+        handleDataURL(transfer.getData('text/plain'));
+      }
+    });
+    fileInputEl.addEventListener('change', () => {
+      const file = fileInputEl.files[0];
+      fileInputEl.value = '';
+      if (file) handleFile(file);
+    });
+    copyBtnEl.addEventListener('click', copyDecodedResult);
+    resetBtnEl.addEventListener('click', () => {
+      decodeRequestId += 1;
+      copyRequestId += 1;
+      copyState = 'idle';
+      clearDecodeCanvas();
+      decodedState = 'empty';
+      decodedData = '';
+      fileInputEl.value = '';
+      renderDecodedResult();
+    });
+    setLanguage(lang);
   </script>
 </body>
 </html>

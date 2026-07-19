@@ -1,0 +1,19 @@
+# QR Code Generator & Reader
+
+> A lightweight static tool for generating QR codes from exact text and
+> decoding QR codes from local images.
+
+## Product
+
+- Text and images are processed in the browser and are not uploaded.
+- Japanese and English interfaces provide equivalent behavior.
+- Generated QR codes can be downloaded as PNG files.
+- Decoded payloads are rendered as untrusted text and can be copied exactly.
+- The initial page load fetches integrity-checked QR libraries from jsDelivr.
+
+## Documentation
+
+- [Project README](./README.md): Features, usage, local-processing boundaries,
+  project structure, and contract-test instructions.
+- [Product contract](./PRODUCT.md): Users, product purpose, design principles,
+  and accessibility requirements.
