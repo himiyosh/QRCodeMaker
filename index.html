@@ -3,100 +3,135 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="テキストからQRコードを作成し、画像内のQRコードを解読できる、ブラウザー内完結の無料ツールです。">
+  <meta name="theme-color" content="#090d14">
   <link rel="icon" href="data:,">
   <title>QRコード作成・解読ツール</title>
   <style>
-    /* Hallmark · pre-emit critique: P4 H3 E5 S5 R5 V3 */
-    /* Hallmark · component: QR generation workbench · genre: atmospheric · theme: existing cyan
-     * states: default · hover · focus · active · disabled · loading · error · success
-     * contrast: pass (WCAG 2.1 scoped minimum 7.15:1)
-     */
-    /* 全体スタイル */
+    :root {
+      color-scheme: dark;
+      --page: #090d14;
+      --surface: #121923;
+      --surface-raised: #18212d;
+      --field: #0d131b;
+      --border: #35485a;
+      --border-strong: #6fc3df;
+      --text: #f5f8fa;
+      --muted: #b9c7d3;
+      --accent: #78cae5;
+      --accent-hover: #9bdced;
+      --accent-ink: #062b36;
+      --danger: #ffbcbc;
+      --danger-surface: #331c22;
+    }
     body {
       margin: 0;
-      padding: 0;
-      font-family: sans-serif;
+      padding: 1.5rem 1rem;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      overflow: auto;
-      background: #0a0a1e;
-    }
-    /* コンテナ */
-    .container {
-      background-color: rgba(0,0,0,0.8);
-      border: 2px solid rgba(111,195,223,0.5);
-      border-radius: 12px;
-      box-shadow: 0 0 20px rgba(111,195,223,0.4);
-      padding: 2rem;
-      max-width: 600px;
-      width: 90%;
+      color: var(--text);
+      background: var(--page);
       box-sizing: border-box;
-      text-align: center;
-      margin: 1rem;
+      line-height: 1.5;
     }
-    /* 各セクション枠 */
-    .section {
-      border: 1px solid #6fc3df;
-      border-radius: 8px;
-      padding: 1rem;
-      margin-bottom: 2rem;
+    .container {
+      width: min(100%, 680px);
+      margin: 0 auto;
+      box-sizing: border-box;
     }
-    /* モバイル対応 */
-    @media (max-width: 480px) {
-      .container { padding: 1rem; }
-      button.action { padding-inline: 0.8rem; font-size: 0.9rem; }
+    #lang-switch {
+      display: flex;
+      justify-content: flex-end;
     }
-    #lang-switch { text-align: right; margin-bottom: 1rem; }
     #lang-btn {
-      background: none;
-      border: 1px solid #6fc3df;
-      color: #6fc3df;
       min-width: 44px;
       min-height: 44px;
-      padding: 0.5rem;
-      border-radius: 4px;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--accent);
+      background: transparent;
       cursor: pointer;
+      font: inherit;
+      font-weight: 700;
     }
-    #lang-btn:hover { background-color: rgba(111,195,223,0.2); }
-    h1 { margin: 0.5rem 0; }
+    #lang-btn:hover {
+      border-color: var(--border-strong);
+      background: var(--surface);
+    }
+    .page-header {
+      margin: 0.75rem 0 2rem;
+      text-align: left;
+    }
+    h1 {
+      margin: 0;
+      font-size: 2rem;
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+      text-wrap: balance;
+    }
+    .privacy-note {
+      max-width: 62ch;
+      margin: 0.75rem 0 0;
+      color: var(--muted);
+      font-size: 1rem;
+      text-wrap: pretty;
+    }
+    .section {
+      margin-bottom: 1rem;
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      text-align: center;
+    }
+    h2 {
+      margin: 0 0 1rem;
+      font-size: 1.35rem;
+      line-height: 1.3;
+      text-wrap: balance;
+    }
     .field {
       width: 100%;
-      margin: 0.75rem auto;
+      margin: 0.75rem auto 1rem;
       text-align: left;
     }
     .field-label {
       display: block;
-      margin-bottom: 0.25rem;
-      color: #e0f7fa;
-      font-weight: bold;
+      margin-bottom: 0.375rem;
+      color: var(--text);
+      font-weight: 700;
     }
     input[type=text] {
       width: 100%;
-      padding: 0.5rem;
       min-height: 44px;
+      padding: 0.625rem 0.75rem;
       margin: 0;
-      border: 1px solid #6fc3df;
-      border-radius: 4px;
-      background: #222;
-      color: #e0f7fa;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--field);
+      color: var(--text);
       box-sizing: border-box;
+      font: inherit;
+    }
+    input[type=text]::placeholder {
+      color: #aebbc7;
+      opacity: 1;
     }
     input[type=text][aria-invalid="true"] {
-      border-color: #ffb3b3;
+      border-color: var(--danger);
     }
     .helper {
       min-height: 1.4em;
-      margin: 0.25rem 0 0;
-      color: #9fdae9;
-      font-size: 0.9rem;
+      margin: 0.375rem 0 0;
+      color: var(--muted);
+      font-size: 0.9375rem;
       line-height: 1.4;
     }
     .helper[data-state="error"],
-    .helper[data-state="failed"] {
-      color: #ffb3b3;
+    .helper[data-state="failed"],
+    .helper[data-state="unavailable"] {
+      color: var(--danger);
     }
     .button-row {
       display: flex;
@@ -108,19 +143,21 @@
     button.action {
       display: inline-block;
       min-height: 44px;
-      margin: 0.5rem 0;
-      padding: 0.5rem 1rem;
+      margin: 0.25rem 0;
+      padding: 0.625rem 1rem;
       font-size: 1rem;
-      border: none;
-      border-radius: 4px;
+      font-family: inherit;
+      font-weight: 700;
+      border: 1px solid transparent;
+      border-radius: 8px;
       cursor: pointer;
-      background-color: #6fc3df;
-      color: #002f3e;
+      background-color: var(--accent);
+      color: var(--accent-ink);
       white-space: nowrap;
       transition: background-color 120ms, transform 120ms;
     }
     button.action:hover {
-      background-color: #8ed5e6;
+      background-color: var(--accent-hover);
     }
     button.action:active { transform: translateY(1px); }
     button.action:disabled {
@@ -128,27 +165,29 @@
       cursor: not-allowed;
     }
     button.action.secondary {
-      border: 1px solid #6fc3df;
+      border-color: var(--border);
       background: transparent;
-      color: #9fdae9;
+      color: var(--accent);
     }
-    button.action.secondary:hover { background: rgba(111,195,223,0.12); }
+    button.action.secondary:hover {
+      border-color: var(--border-strong);
+      background: var(--surface-raised);
+    }
     #lang-btn:focus-visible,
     input[type=text]:focus-visible {
-      outline: 3px solid #8ed5e6;
+      outline: 3px solid var(--accent-hover);
       outline-offset: 3px;
     }
     button.action:focus-visible {
-      outline: 3px solid #002f3e;
-      outline-offset: 0;
-      box-shadow: 0 0 0 5px #fff;
+      outline: 3px solid var(--accent-hover);
+      outline-offset: 3px;
     }
     [hidden] { display: none !important; }
     canvas {
       display: block;
       margin: 1rem auto;
-      border: 1px solid #6fc3df;
-      border-radius: 4px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
       background: #000;
       box-sizing: border-box;
       max-width: 100%;
@@ -160,9 +199,9 @@
       aspect-ratio: 1;
       margin: 1rem auto 0;
       place-items: center;
-      border: 1px dashed #6fc3df;
-      border-radius: 4px;
-      background: rgba(111,195,223,0.05);
+      border: 1px dashed var(--border-strong);
+      border-radius: 8px;
+      background: var(--field);
       box-sizing: border-box;
     }
     .qr-preview[data-state="ready"],
@@ -180,59 +219,67 @@
     .preview-empty {
       max-width: 18ch;
       margin: 0;
-      color: #9fdae9;
+      color: var(--muted);
       line-height: 1.5;
     }
     #generate-status { text-align: center; }
+    .workflow-hint {
+      margin: 1.25rem 0 0;
+      color: var(--muted);
+      font-size: 0.9375rem;
+    }
     #result {
-      text-align: center;
-      font-weight: bold;
+      margin: 1rem 0 0;
+      padding: 0.875rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--surface-raised);
+      text-align: left;
+      font-weight: 600;
       white-space: pre-wrap;
       overflow-wrap: break-word;
-      margin-top: 1rem;
-      background-color: rgba(255,235,59,0.2);
-      padding: 0.75rem;
-      border-radius: 6px;
-      font-size: 1.1rem;
-      color: #fff; /* 読みやすい白文字 */
     }
     #result:empty { display: none; }
+    #result[data-state="notFound"],
     #result[data-state="invalidFile"],
+    #result[data-state="fileTooLarge"],
     #result[data-state="readFailed"],
-    #result[data-state="imageFailed"] {
-      border: 1px solid #ffb3b3;
-      background-color: rgba(120,20,20,0.35);
-      color: #ffe3e3;
+    #result[data-state="imageFailed"],
+    #result[data-state="unavailable"] {
+      border-color: var(--danger);
+      background-color: var(--danger-surface);
+      color: #ffe7e7;
     }
     #drop-zone {
       display: flex;
-      min-height: 132px;
+      width: 100%;
+      min-height: 144px;
       align-items: center;
       justify-content: center;
       flex-direction: column;
       gap: 0.5rem;
-      border: 2px dashed #6fc3df;
+      border: 1px dashed var(--border-strong);
       border-radius: 8px;
-      padding: 2rem;
-      margin: 0.5rem auto;
-      color: #6fc3df;
+      padding: 1.5rem;
+      margin: 0.5rem 0;
+      color: var(--accent);
       transition: border-color 180ms, color 180ms, background-color 180ms;
-      background: rgba(111,195,223,0.05);
-      width: 80%;
+      background: var(--field);
       box-sizing: border-box;
       cursor: pointer;
     }
     #drop-zone.hover,
     #drop-zone:focus-within {
-      border-color: #fff;
-      color: #fff;
+      border-color: var(--accent-hover);
+      color: var(--text);
     }
     #drop-zone:focus-within {
-      outline: 3px solid #8ed5e6;
+      outline: 3px solid var(--accent-hover);
       outline-offset: 3px;
     }
     #drop-zone:active {
-      background: rgba(111,195,223,0.12);
+      background: var(--surface-raised);
     }
     #drop-zone:has(input:disabled) {
       opacity: 0.55;
@@ -243,20 +290,20 @@
       cursor: progress;
     }
     #drop-zone[data-state="error"] {
-      border-color: #ffb3b3;
+      border-color: var(--danger);
     }
     #drop-zone[data-state="success"] {
       border-style: solid;
     }
     @media (hover: hover) and (pointer: fine) {
       #drop-zone:hover {
-        border-color: #fff;
-        color: #fff;
+        border-color: var(--accent-hover);
+        color: var(--text);
       }
     }
     .drop-zone-action {
-      color: #e0f7fa;
-      font-weight: bold;
+      color: var(--text);
+      font-weight: 700;
       text-decoration: underline;
       text-underline-offset: 0.2em;
     }
@@ -271,6 +318,14 @@
       white-space: nowrap;
       border: 0;
     }
+    @media (max-width: 480px) {
+      body { padding: 1rem 0.75rem; }
+      h1 { font-size: 1.625rem; }
+      .page-header { margin-bottom: 1.5rem; }
+      .section { padding: 1rem; }
+      .button-row { align-items: stretch; }
+      .button-row .action { width: 100%; }
+    }
     @media (prefers-reduced-motion: reduce) {
       button.action { transition: none; }
       button.action:active { transform: none; }
@@ -281,9 +336,12 @@
 <body>
   <main class="container">
     <div id="lang-switch"><button id="lang-btn">EN</button></div>
-    <h1 id="title">QRコード作成・解読ツール</h1>
+    <header class="page-header">
+      <h1 id="title">QRコード作成・解読ツール</h1>
+      <p id="privacy-note" class="privacy-note">テキストと画像はこのブラウザー内だけで処理され、外部へ送信されません。</p>
+    </header>
 
-    <div class="section" id="generate">
+    <section class="section" id="generate" aria-labelledby="gen-title">
       <h2 id="gen-title">生成</h2>
       <div class="field">
         <label id="text-label" class="field-label" for="text-input">QRコードにするテキスト</label>
@@ -299,10 +357,10 @@
         <canvas id="generate-canvas" hidden width="256" height="256" draggable="true" aria-label="生成されたQRコード"></canvas>
       </div>
       <p id="generate-status" class="helper" role="status" aria-live="polite"></p>
-      <p id="hint" style="font-size:0.9rem; color:#6fc3df;">生成したQRコードをドラッグして解読エリアにドロップできます</p>
-    </div>
+      <p id="hint" class="workflow-hint">生成したQRコードをドラッグして解読エリアにドロップできます</p>
+    </section>
 
-    <div class="section" id="decode">
+    <section class="section" id="decode" aria-labelledby="dec-title">
       <h2 id="dec-title">解読</h2>
       <label id="drop-zone" for="file-input" data-state="empty" aria-busy="false">
         <span id="drop-zone-text">ここに画像をドロップ</span>
@@ -310,20 +368,26 @@
         <input id="file-input" class="visually-hidden" type="file" accept="image/*" aria-describedby="result">
       </label>
       <div class="button-row">
-        <button id="reset-btn" class="action">リセット</button>
+        <button id="reset-btn" class="action secondary" hidden>解読結果をクリア</button>
       </div>
       <canvas id="decode-canvas" hidden width="200" height="200" aria-label="解読に使用した画像"></canvas>
       <p id="result" role="status" aria-live="polite" data-state="empty"></p>
-    </div>
+    </section>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"
+          integrity="sha384-HGmnkDZJy7mRkoARekrrj0VjEFSh9a0Z8qxGri/kTTAJkgR8hqD1lHsYSh3JdzRi"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"
+          integrity="sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script>
     // 多言語テキスト
     const texts = {
       ja: {
         title: 'QRコード作成・解読ツール',
+        description: 'テキストからQRコードを作成し、画像内のQRコードを解読できる、ブラウザー内完結の無料ツールです。',
+        privacyNote: 'テキストと画像はこのブラウザー内だけで処理され、外部へ送信されません。',
         genTitle: '生成',
         decTitle: '解読',
         inputLabel: 'QRコードにするテキスト',
@@ -334,6 +398,7 @@
         generating: '生成中…',
         generated: count => `QRコードを生成しました（${count}文字）`,
         generationFailed: 'QRコードを生成できませんでした。入力を短くして、もう一度お試しください。',
+        generationUnavailable: 'QRコード生成機能を読み込めませんでした。接続を確認してページを再読み込みしてください。',
         previewEmpty: '生成したQRコードがここに表示されます',
         previewLabel: '生成されたQRコード',
         decodeCanvasLabel: '解読に使用した画像',
@@ -342,17 +407,21 @@
         hint: '生成したQRコードをドラッグして解読エリアにドロップできます',
         dropZone: 'ここに画像をドロップ',
         fileBtn: '画像を選択',
-        resetBtn: 'リセット',
+        clearDecodeBtn: '解読結果をクリア',
         decoding: '画像を読み込んでいます…',
         decoded: '解読結果: ',
         notFound: 'QRコードが見つかりませんでした。QRコード全体が写った鮮明な画像を選択してください。',
         invalidFile: '画像ファイルではありません。PNG、JPEG、GIF、WebPなどの画像を選択してください。',
+        fileTooLarge: '画像が大きすぎます。20 MB以下の画像を選択してください。',
         readFailed: '画像ファイルを読み込めませんでした。別の画像を選択してください。',
         imageFailed: 'この画像を開けませんでした。別の画像ファイルを選択してください。',
+        decodeUnavailable: 'QRコード解読機能を読み込めませんでした。接続を確認してページを再読み込みしてください。',
         switchLanguage: 'Switch to English'
       },
       en: {
         title: 'QR Code Generator & Reader',
+        description: 'Create QR codes from text and decode QR codes from images entirely in your browser.',
+        privacyNote: 'Text and images are processed only in this browser and are never sent elsewhere.',
         genTitle: 'Generate',
         decTitle: 'Decode',
         inputLabel: 'Text to encode',
@@ -363,6 +432,7 @@
         generating: 'Generating…',
         generated: count => `QR code ready (${count} characters)`,
         generationFailed: 'The QR code could not be generated. Shorten the input and try again.',
+        generationUnavailable: 'The QR generator could not be loaded. Check your connection and reload the page.',
         previewEmpty: 'Your generated QR code will appear here',
         previewLabel: 'Generated QR code',
         decodeCanvasLabel: 'Image used for decoding',
@@ -371,13 +441,15 @@
         hint: 'Drag the generated QR code here to decode it',
         dropZone: 'Drop an image here',
         fileBtn: 'Choose an image',
-        resetBtn: 'Reset',
+        clearDecodeBtn: 'Clear decoded result',
         decoding: 'Reading the image…',
         decoded: 'Decoded: ',
         notFound: 'No QR code was found. Choose a clear image that shows the complete QR code.',
         invalidFile: 'That file is not an image. Choose a PNG, JPEG, GIF, WebP, or another image file.',
+        fileTooLarge: 'That image is too large. Choose an image no larger than 20 MB.',
         readFailed: 'The image file could not be read. Choose another image.',
         imageFailed: 'The image could not be opened. Choose another image file.',
+        decodeUnavailable: 'The QR reader could not be loaded. Check your connection and reload the page.',
         switchLanguage: '日本語に切り替える'
       }
     };
@@ -387,6 +459,7 @@
     let decodedState = 'empty';
     let decodedData = '';
     let decodeRequestId = 0;
+    const maxDecodeFileBytes = 20 * 1024 * 1024;
 
     // QR生成と解読
     const langBtnEl = document.getElementById('lang-btn');
@@ -408,6 +481,8 @@
     const dropZoneEl = document.getElementById('drop-zone');
     const dropZoneTextEl = document.getElementById('drop-zone-text');
     const dropZoneActionEl = document.getElementById('drop-zone-action');
+    const descriptionMetaEl = document.querySelector('meta[name="description"]');
+    const privacyNoteEl = document.getElementById('privacy-note');
 
     function renderGenerationState() {
       const t = texts[lang];
@@ -433,6 +508,8 @@
         generateStatusEl.textContent = t.downloaded;
       } else if (generationState === 'failed') {
         generateStatusEl.textContent = t.generationFailed;
+      } else if (generationState === 'unavailable') {
+        generateStatusEl.textContent = t.generationUnavailable;
       } else {
         generateStatusEl.textContent = '';
       }
@@ -447,15 +524,21 @@
         resultPEl.textContent = texts[lang].notFound;
       } else if (decodedState === 'invalidFile') {
         resultPEl.textContent = texts[lang].invalidFile;
+      } else if (decodedState === 'fileTooLarge') {
+        resultPEl.textContent = texts[lang].fileTooLarge;
       } else if (decodedState === 'readFailed') {
         resultPEl.textContent = texts[lang].readFailed;
       } else if (decodedState === 'imageFailed') {
         resultPEl.textContent = texts[lang].imageFailed;
+      } else if (decodedState === 'unavailable') {
+        resultPEl.textContent = texts[lang].decodeUnavailable;
       } else {
         resultPEl.textContent = '';
       }
       resultPEl.dataset.state = decodedState;
-      dropZoneEl.dataset.state = ['notFound', 'invalidFile', 'readFailed', 'imageFailed'].includes(decodedState)
+      resetBtnEl.hidden = decodedState === 'empty';
+      resetBtnEl.disabled = decodedState === 'empty';
+      dropZoneEl.dataset.state = ['notFound', 'invalidFile', 'fileTooLarge', 'readFailed', 'imageFailed', 'unavailable'].includes(decodedState)
         ? 'error'
         : decodedState;
       dropZoneEl.setAttribute('aria-busy', decodedState === 'loading' ? 'true' : 'false');
@@ -466,7 +549,9 @@
       const t = texts[lang];
       document.documentElement.lang = lang;
       document.title = t.title;
+      descriptionMetaEl.content = t.description;
       document.getElementById('title').textContent = t.title;
+      privacyNoteEl.textContent = t.privacyNote;
       document.getElementById('gen-title').textContent = t.genTitle;
       document.getElementById('dec-title').textContent = t.decTitle;
       textLabelEl.textContent = t.inputLabel;
@@ -480,7 +565,7 @@
       dropZoneTextEl.textContent = t.dropZone;
       dropZoneActionEl.textContent = t.fileBtn;
       fileInputEl.setAttribute('aria-label', t.fileBtn);
-      resetBtnEl.textContent = t.resetBtn;
+      resetBtnEl.textContent = t.clearDecodeBtn;
       langBtnEl.textContent = lang === 'ja' ? 'EN' : 'JA';
       langBtnEl.setAttribute('aria-label', t.switchLanguage);
       renderGenerationState();
@@ -493,6 +578,11 @@
         generationState = 'error';
         renderGenerationState();
         textInputEl.focus();
+        return;
+      }
+      if (typeof QRCode === 'undefined' || typeof QRCode.toCanvas !== 'function') {
+        generationState = 'unavailable';
+        renderGenerationState();
         return;
       }
 
@@ -558,6 +648,10 @@
 
     function decodeImage(img, requestId) {
       if (requestId !== decodeRequestId) return;
+      if (typeof jsQR !== 'function') {
+        finishDecode(requestId, 'unavailable');
+        return;
+      }
       const sourceWidth = img.naturalWidth || img.width;
       const sourceHeight = img.naturalHeight || img.height;
       if (!sourceWidth || !sourceHeight) {
@@ -589,6 +683,10 @@
       const requestId = beginDecode();
       if (file.type && !file.type.startsWith('image/')) {
         finishDecode(requestId, 'invalidFile');
+        return;
+      }
+      if (file.size > maxDecodeFileBytes) {
+        finishDecode(requestId, 'fileTooLarge');
         return;
       }
       const reader = new FileReader();
@@ -652,15 +750,10 @@
     });
     resetBtnEl.addEventListener('click', () => {
       decodeRequestId += 1;
-      textInputEl.value = '';
-      generatedText = '';
-      generationState = 'empty';
-      generateCtxEl.clearRect(0, 0, generateCanvasEl.width, generateCanvasEl.height);
       clearDecodeCanvas();
       decodedState = 'empty';
       decodedData = '';
       fileInputEl.value = '';
-      renderGenerationState();
       renderDecodedResult();
     });
     setLanguage(lang);

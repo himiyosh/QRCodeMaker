@@ -25,8 +25,12 @@ This project is a web-based application for generating and decoding QR codes. Us
 1. Drag and drop an image into the "Drop an image here" area.
 2. Alternatively, select "Choose an image" to open the native file picker.
 3. The decoded result will be displayed below.
-4. Unsupported, unreadable, or damaged files receive inline guidance in the
-   selected language; the image still stays in the browser.
+4. Unsupported, over-20-MB, unreadable, or damaged files receive inline
+   guidance in the selected language; the image still stays in the browser.
+
+QR generation and decoding run in the browser. The initial page load fetches
+version-pinned, integrity-checked QR libraries from jsDelivr, so an internet
+connection is required when those files are not already cached.
 
 ## Project Structure
 

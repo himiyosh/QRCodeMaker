@@ -10,6 +10,34 @@ test('the inline application script parses', () => {
   assert.doesNotThrow(() => new Function(script));
 });
 
+test('the page describes its local-only purpose for people and search engines', () => {
+  assert.match(html, /<meta name="description" content="[^"]+"/);
+  assert.match(html, /id="privacy-note" class="privacy-note"/);
+  for (const key of ['description', 'privacyNote']) {
+    assert.equal((html.match(new RegExp(`${key}:`, 'g')) || []).length, 2, key);
+  }
+  assert.match(html, /descriptionMetaEl\.content = t\.description;/);
+});
+
+test('third-party QR libraries are version-pinned and integrity checked', () => {
+  assert.match(html, /qrcode@1\.5\.1\/build\/qrcode\.min\.js/);
+  assert.match(html, /jsqr@1\.4\.0\/dist\/jsQR\.js/);
+  assert.equal((html.match(/integrity="sha384-[A-Za-z0-9+/=]+"/g) || []).length, 2);
+  assert.equal((html.match(/crossorigin="anonymous" referrerpolicy="no-referrer"/g) || []).length, 2);
+  assert.doesNotMatch(html, /npm\/qrcode\/build/);
+  assert.doesNotMatch(html, /npm\/jsqr\/dist/);
+});
+
+test('missing QR libraries and oversized images fail with recoverable guidance', () => {
+  assert.match(html, /typeof QRCode === 'undefined' \|\| typeof QRCode\.toCanvas !== 'function'/);
+  assert.match(html, /typeof jsQR !== 'function'/);
+  assert.match(html, /const maxDecodeFileBytes = 20 \* 1024 \* 1024;/);
+  assert.match(html, /file\.size > maxDecodeFileBytes/);
+  for (const key of ['generationUnavailable', 'fileTooLarge', 'decodeUnavailable']) {
+    assert.equal((html.match(new RegExp(`${key}:`, 'g')) || []).length, 2, key);
+  }
+});
+
 test('QR generation preserves exact input and a four-module quiet zone', () => {
   assert.match(html, /const text = textInputEl\.value;/);
   assert.doesNotMatch(html, /textInputEl\.value\.trim\(/);
@@ -70,13 +98,25 @@ test('new decoder requests supersede stale reads and allow retrying the same fil
 });
 
 test('document and decoded-result semantics stay synchronized', () => {
-  assert.match(html, /<main class="container">[\s\S]*id="decode"[\s\S]*<\/main>/);
+  assert.match(html, /<main class="container">[\s\S]*<section[^>]+id="decode"[\s\S]*<\/main>/);
   assert.match(html, /document\.documentElement\.lang = lang;/);
   assert.match(html, /document\.title = t\.title;/);
   assert.match(html, /id="result" role="status" aria-live="polite" data-state="empty"/);
   assert.match(html, /resultPEl\.dataset\.state = decodedState;/);
   assert.match(html, /decodeCanvasEl\.setAttribute\('aria-label', t\.decodeCanvasLabel\)/);
   assert.match(html, /generatePreviewEl\.dataset\.state = generationState;/);
+});
+
+test('clearing a decoded result does not erase generation work', () => {
+  assert.match(html, /clearDecodeBtn:/);
+  assert.match(html, /id="reset-btn"[^>]+hidden/);
+  assert.match(html, /resetBtnEl\.hidden = decodedState === 'empty'/);
+  const resetHandler = html.match(/resetBtnEl\.addEventListener\('click', \(\) => \{([\s\S]*?)\n    \}\);/)?.[1];
+  assert.ok(resetHandler, 'expected the decoded-result clear handler');
+  assert.match(resetHandler, /clearDecodeCanvas\(\)/);
+  assert.match(resetHandler, /decodedState = 'empty'/);
+  assert.doesNotMatch(resetHandler, /textInputEl\.value/);
+  assert.doesNotMatch(resetHandler, /generationState/);
 });
 
 test('the page has no continuously animated decorative canvas', () => {
@@ -117,8 +157,10 @@ test('Japanese and English decoder copy stay in sync', () => {
     'decoded',
     'notFound',
     'invalidFile',
+    'fileTooLarge',
     'readFailed',
     'imageFailed',
+    'decodeUnavailable',
   ]) {
     assert.equal((html.match(new RegExp(`${key}:`, 'g')) || []).length, 2, key);
   }
