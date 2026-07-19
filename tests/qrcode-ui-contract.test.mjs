@@ -44,6 +44,15 @@ test('QR generation preserves exact input and a four-module quiet zone', () => {
   assert.match(html, /\{ width: 256, margin: 4, errorCorrectionLevel: 'M' \}/);
 });
 
+test('multiline generation preserves Enter and offers an explicit shortcut', () => {
+  assert.match(html, /<textarea id="text-input"[^>]+rows="4"[\s\S]*?<\/textarea>/);
+  assert.doesNotMatch(html, /<input id="text-input"/);
+  assert.match(html, /event\.key === 'Enter' && \(event\.ctrlKey \|\| event\.metaKey\)/);
+  assert.match(html, /event\.preventDefault\(\);\s+generateQRCode\(\);/);
+  assert.match(html, /if \(generationState === 'generating'\) return;/);
+  assert.doesNotMatch(html, /if \(event\.key === 'Enter'\) generateQRCode/);
+});
+
 test('the generation form exposes labelled and announced states', () => {
   assert.match(html, /<label[^>]+for="text-input"/);
   assert.match(html, /id="generate-status"[^>]+role="status"[^>]+aria-live="polite"/);
@@ -119,6 +128,16 @@ test('clearing a decoded result does not erase generation work', () => {
   assert.doesNotMatch(resetHandler, /generationState/);
 });
 
+test('successful decoding exposes exact-payload copy with explicit feedback', () => {
+  assert.match(html, /id="copy-btn"[^>]+hidden/);
+  assert.match(html, /id="copy-status"[^>]+role="status"[^>]+aria-live="polite"/);
+  assert.match(html, /navigator\.clipboard\.writeText\(data\)/);
+  assert.match(html, /const data = decodedData;/);
+  assert.match(html, /copyState = 'copied'/);
+  assert.match(html, /copyState = 'failed'/);
+  assert.match(html, /console\.error\('Copying decoded result failed', error\)/);
+});
+
 test('the page has no continuously animated decorative canvas', () => {
   assert.doesNotMatch(html, /id="bg-canvas"/);
   assert.doesNotMatch(html, /requestAnimationFrame\(/);
@@ -144,6 +163,10 @@ test('Japanese and English generation copy stay in sync', () => {
     'decodeCanvasLabel',
     'downloadBtn',
     'downloaded',
+    'copyBtn',
+    'copying',
+    'copied',
+    'copyFailed',
   ]) {
     assert.equal((html.match(new RegExp(`${key}:`, 'g')) || []).length, 2, key);
   }

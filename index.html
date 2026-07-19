@@ -102,9 +102,9 @@
       color: var(--text);
       font-weight: 700;
     }
-    input[type=text] {
+    textarea {
       width: 100%;
-      min-height: 44px;
+      min-height: 7rem;
       padding: 0.625rem 0.75rem;
       margin: 0;
       border: 1px solid var(--border);
@@ -113,12 +113,14 @@
       color: var(--text);
       box-sizing: border-box;
       font: inherit;
+      line-height: 1.5;
+      resize: vertical;
     }
-    input[type=text]::placeholder {
+    textarea::placeholder {
       color: #aebbc7;
       opacity: 1;
     }
-    input[type=text][aria-invalid="true"] {
+    textarea[aria-invalid="true"] {
       border-color: var(--danger);
     }
     .helper {
@@ -174,7 +176,7 @@
       background: var(--surface-raised);
     }
     #lang-btn:focus-visible,
-    input[type=text]:focus-visible {
+    textarea:focus-visible {
       outline: 3px solid var(--accent-hover);
       outline-offset: 3px;
     }
@@ -241,6 +243,11 @@
       overflow-wrap: break-word;
     }
     #result:empty { display: none; }
+    .decode-actions { margin-top: 1rem; }
+    #copy-status:empty {
+      min-height: 0;
+      margin: 0;
+    }
     #result[data-state="notFound"],
     #result[data-state="invalidFile"],
     #result[data-state="fileTooLarge"],
@@ -345,8 +352,8 @@
       <h2 id="gen-title">生成</h2>
       <div class="field">
         <label id="text-label" class="field-label" for="text-input">QRコードにするテキスト</label>
-        <input id="text-input" type="text" placeholder="例: https://example.com" aria-describedby="text-helper generate-status" aria-invalid="false">
-        <p id="text-helper" class="helper">先頭や末尾の空白も入力どおりに保存されます</p>
+        <textarea id="text-input" rows="4" placeholder="例: https://example.com" aria-describedby="text-helper generate-status" aria-invalid="false"></textarea>
+        <p id="text-helper" class="helper">空白と改行を入力どおりに保存します。Ctrl/⌘ + Enterでも生成できます</p>
       </div>
       <div class="button-row">
         <button id="generate-btn" class="action">QRコードを生成</button>
@@ -367,11 +374,13 @@
         <span id="drop-zone-action" class="drop-zone-action" aria-hidden="true">画像を選択</span>
         <input id="file-input" class="visually-hidden" type="file" accept="image/*" aria-describedby="result">
       </label>
-      <div class="button-row">
-        <button id="reset-btn" class="action secondary" hidden>解読結果をクリア</button>
-      </div>
       <canvas id="decode-canvas" hidden width="200" height="200" aria-label="解読に使用した画像"></canvas>
       <p id="result" role="status" aria-live="polite" data-state="empty"></p>
+      <div id="decode-actions" class="button-row decode-actions" hidden>
+        <button id="copy-btn" class="action" hidden>結果をコピー</button>
+        <button id="reset-btn" class="action secondary" hidden>解読結果をクリア</button>
+      </div>
+      <p id="copy-status" class="helper" role="status" aria-live="polite"></p>
     </section>
   </main>
 
@@ -392,7 +401,7 @@
         decTitle: '解読',
         inputLabel: 'QRコードにするテキスト',
         inputPlaceholder: '例: https://example.com',
-        inputHelper: '先頭や末尾の空白も入力どおりに保存されます',
+        inputHelper: '空白と改行を入力どおりに保存します。Ctrl/⌘ + Enterでも生成できます',
         inputRequired: 'テキストが空です。QRコードにする内容を入力してください。',
         generateBtn: 'QRコードを生成',
         generating: '生成中…',
@@ -407,6 +416,10 @@
         hint: '生成したQRコードをドラッグして解読エリアにドロップできます',
         dropZone: 'ここに画像をドロップ',
         fileBtn: '画像を選択',
+        copyBtn: '結果をコピー',
+        copying: 'コピー中…',
+        copied: '解読結果をコピーしました',
+        copyFailed: 'コピーできませんでした。結果を選択して手動でコピーしてください。',
         clearDecodeBtn: '解読結果をクリア',
         decoding: '画像を読み込んでいます…',
         decoded: '解読結果: ',
@@ -426,7 +439,7 @@
         decTitle: 'Decode',
         inputLabel: 'Text to encode',
         inputPlaceholder: 'Example: https://example.com',
-        inputHelper: 'Leading and trailing spaces are preserved exactly',
+        inputHelper: 'Spaces and line breaks are preserved exactly. Press Ctrl/⌘ + Enter to generate.',
         inputRequired: 'The text is empty. Enter the content to encode.',
         generateBtn: 'Generate QR Code',
         generating: 'Generating…',
@@ -441,6 +454,10 @@
         hint: 'Drag the generated QR code here to decode it',
         dropZone: 'Drop an image here',
         fileBtn: 'Choose an image',
+        copyBtn: 'Copy result',
+        copying: 'Copying…',
+        copied: 'Decoded result copied',
+        copyFailed: 'The result could not be copied. Select it and copy it manually.',
         clearDecodeBtn: 'Clear decoded result',
         decoding: 'Reading the image…',
         decoded: 'Decoded: ',
@@ -459,6 +476,8 @@
     let decodedState = 'empty';
     let decodedData = '';
     let decodeRequestId = 0;
+    let copyState = 'idle';
+    let copyRequestId = 0;
     const maxDecodeFileBytes = 20 * 1024 * 1024;
 
     // QR生成と解読
@@ -474,6 +493,9 @@
     const generateCanvasEl = document.getElementById('generate-canvas');
     const generateCtxEl = generateCanvasEl.getContext('2d', { willReadFrequently: true });
     const fileInputEl = document.getElementById('file-input');
+    const decodeActionsEl = document.getElementById('decode-actions');
+    const copyBtnEl = document.getElementById('copy-btn');
+    const copyStatusEl = document.getElementById('copy-status');
     const resetBtnEl = document.getElementById('reset-btn');
     const decodeCanvasEl = document.getElementById('decode-canvas');
     const decodeCtxEl = decodeCanvasEl.getContext('2d', { willReadFrequently: true });
@@ -536,6 +558,16 @@
         resultPEl.textContent = '';
       }
       resultPEl.dataset.state = decodedState;
+      decodeActionsEl.hidden = decodedState === 'empty';
+      copyBtnEl.hidden = decodedState !== 'success';
+      copyBtnEl.disabled = copyState === 'copying';
+      copyBtnEl.textContent = copyState === 'copying' ? texts[lang].copying : texts[lang].copyBtn;
+      copyStatusEl.dataset.state = copyState;
+      copyStatusEl.textContent = copyState === 'copied'
+        ? texts[lang].copied
+        : copyState === 'failed'
+          ? texts[lang].copyFailed
+          : '';
       resetBtnEl.hidden = decodedState === 'empty';
       resetBtnEl.disabled = decodedState === 'empty';
       dropZoneEl.dataset.state = ['notFound', 'invalidFile', 'fileTooLarge', 'readFailed', 'imageFailed', 'unavailable'].includes(decodedState)
@@ -565,6 +597,7 @@
       dropZoneTextEl.textContent = t.dropZone;
       dropZoneActionEl.textContent = t.fileBtn;
       fileInputEl.setAttribute('aria-label', t.fileBtn);
+      copyBtnEl.textContent = t.copyBtn;
       resetBtnEl.textContent = t.clearDecodeBtn;
       langBtnEl.textContent = lang === 'ja' ? 'EN' : 'JA';
       langBtnEl.setAttribute('aria-label', t.switchLanguage);
@@ -573,6 +606,7 @@
     }
 
     async function generateQRCode() {
+      if (generationState === 'generating') return;
       const text = textInputEl.value;
       if (text.length === 0) {
         generationState = 'error';
@@ -632,6 +666,8 @@
 
     function beginDecode() {
       const requestId = ++decodeRequestId;
+      copyRequestId += 1;
+      copyState = 'idle';
       clearDecodeCanvas();
       decodedState = 'loading';
       decodedData = '';
@@ -711,11 +747,39 @@
       loadImageSource(url, requestId);
     }
 
+    async function copyDecodedResult() {
+      if (decodedState !== 'success') return;
+      const requestId = ++copyRequestId;
+      const data = decodedData;
+      copyState = 'copying';
+      renderDecodedResult();
+
+      if (typeof navigator.clipboard?.writeText !== 'function') {
+        copyState = 'failed';
+        renderDecodedResult();
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(data);
+        if (requestId !== copyRequestId || decodedState !== 'success' || decodedData !== data) return;
+        copyState = 'copied';
+      } catch (error) {
+        console.error('Copying decoded result failed', error);
+        if (requestId !== copyRequestId) return;
+        copyState = 'failed';
+      }
+      renderDecodedResult();
+    }
+
     langBtnEl.addEventListener('click', () => setLanguage(lang === 'ja' ? 'en' : 'ja'));
     generateBtnEl.addEventListener('click', generateQRCode);
     downloadBtnEl.addEventListener('click', downloadQRCode);
     textInputEl.addEventListener('keydown', event => {
-      if (event.key === 'Enter') generateQRCode();
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        generateQRCode();
+      }
     });
     textInputEl.addEventListener('input', () => {
       if (generationState !== 'empty') {
@@ -748,8 +812,11 @@
       fileInputEl.value = '';
       if (file) handleFile(file);
     });
+    copyBtnEl.addEventListener('click', copyDecodedResult);
     resetBtnEl.addEventListener('click', () => {
       decodeRequestId += 1;
+      copyRequestId += 1;
+      copyState = 'idle';
       clearDecodeCanvas();
       decodedState = 'empty';
       decodedData = '';
