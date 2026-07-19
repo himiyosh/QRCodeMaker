@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src https://cdn.jsdelivr.net 'sha256-/vpkccFd1VSJ/m+zg7l6elpfmYs3E1ISUzlbDiC6lnE='; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
   <meta name="description" content="テキストからQRコードを作成し、画像内のQRコードを解読できる、ブラウザー内完結の無料ツールです。">
   <meta name="theme-color" content="#090d14">
   <link rel="icon" href="data:,">
@@ -253,6 +256,7 @@
     #result[data-state="fileTooLarge"],
     #result[data-state="readFailed"],
     #result[data-state="imageFailed"],
+    #result[data-state="decodeFailed"],
     #result[data-state="unavailable"] {
       border-color: var(--danger);
       background-color: var(--danger-surface);
@@ -428,6 +432,7 @@
         fileTooLarge: '画像が大きすぎます。20 MB以下の画像を選択してください。',
         readFailed: '画像ファイルを読み込めませんでした。別の画像を選択してください。',
         imageFailed: 'この画像を開けませんでした。別の画像ファイルを選択してください。',
+        decodeFailed: 'この画像を処理できませんでした。別の画像ファイルを選択してください。',
         decodeUnavailable: 'QRコード解読機能を読み込めませんでした。接続を確認してページを再読み込みしてください。',
         switchLanguage: 'Switch to English'
       },
@@ -466,6 +471,7 @@
         fileTooLarge: 'That image is too large. Choose an image no larger than 20 MB.',
         readFailed: 'The image file could not be read. Choose another image.',
         imageFailed: 'The image could not be opened. Choose another image file.',
+        decodeFailed: 'The image could not be processed. Choose another image file.',
         decodeUnavailable: 'The QR reader could not be loaded. Check your connection and reload the page.',
         switchLanguage: '日本語に切り替える'
       }
@@ -552,6 +558,8 @@
         resultPEl.textContent = texts[lang].readFailed;
       } else if (decodedState === 'imageFailed') {
         resultPEl.textContent = texts[lang].imageFailed;
+      } else if (decodedState === 'decodeFailed') {
+        resultPEl.textContent = texts[lang].decodeFailed;
       } else if (decodedState === 'unavailable') {
         resultPEl.textContent = texts[lang].decodeUnavailable;
       } else {
@@ -570,7 +578,7 @@
           : '';
       resetBtnEl.hidden = decodedState === 'empty';
       resetBtnEl.disabled = decodedState === 'empty';
-      dropZoneEl.dataset.state = ['notFound', 'invalidFile', 'fileTooLarge', 'readFailed', 'imageFailed', 'unavailable'].includes(decodedState)
+      dropZoneEl.dataset.state = ['notFound', 'invalidFile', 'fileTooLarge', 'readFailed', 'imageFailed', 'decodeFailed', 'unavailable'].includes(decodedState)
         ? 'error'
         : decodedState;
       dropZoneEl.setAttribute('aria-busy', decodedState === 'loading' ? 'true' : 'false');
@@ -698,14 +706,19 @@
       const scale = Math.min(1, maxDecodeSize / sourceWidth, maxDecodeSize / sourceHeight);
       const width = Math.max(1, Math.round(sourceWidth * scale));
       const height = Math.max(1, Math.round(sourceHeight * scale));
-      decodeCanvasEl.hidden = false;
-      decodeCanvasEl.width = width;
-      decodeCanvasEl.height = height;
-      decodeCtxEl.clearRect(0, 0, width, height);
-      decodeCtxEl.drawImage(img, 0, 0, width, height);
-      const data = decodeCtxEl.getImageData(0, 0, width, height);
-      const code = jsQR(data.data, data.width, data.height);
-      finishDecode(requestId, code ? 'success' : 'notFound', code?.data || '');
+      try {
+        decodeCanvasEl.hidden = false;
+        decodeCanvasEl.width = width;
+        decodeCanvasEl.height = height;
+        decodeCtxEl.clearRect(0, 0, width, height);
+        decodeCtxEl.drawImage(img, 0, 0, width, height);
+        const data = decodeCtxEl.getImageData(0, 0, width, height);
+        const code = jsQR(data.data, data.width, data.height);
+        finishDecode(requestId, code ? 'success' : 'notFound', code?.data || '');
+      } catch (error) {
+        console.error('QR decoding failed', error);
+        finishDecode(requestId, 'decodeFailed');
+      }
     }
 
     function loadImageSource(source, requestId) {

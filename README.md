@@ -38,13 +38,16 @@ connection is required when those files are not already cached.
 ```
 QRCodeMaker/
 ├── index.html
+├── llms.txt
 ├── PRODUCT.md
 ├── README.md
+├── robots.txt
 ├── tests/
 │   └── qrcode-ui-contract.test.mjs
 └── .github/
     ├── agents/QRCodeMakerAgent.agent.md
-    └── skills/hallmark/
+    ├── skills/hallmark/
+    └── workflows/contracts.yml
 ```
 
 ## Testing
@@ -54,6 +57,8 @@ Run the dependency-free UI contract checks with:
 ```sh
 node --test tests/qrcode-ui-contract.test.mjs
 ```
+
+The same contracts run automatically for pushes and pull requests.
 
 ## Copilot customization
 

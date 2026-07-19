@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+const [html, robots, llms] = await Promise.all([
+  readFile(new URL('../index.html', import.meta.url), 'utf8'),
+  readFile(new URL('../robots.txt', import.meta.url), 'utf8'),
+  readFile(new URL('../llms.txt', import.meta.url), 'utf8'),
+]);
 
 test('the inline application script parses', () => {
   const script = html.match(/<script>([\s\S]*)<\/script>/)?.[1];
@@ -19,6 +24,14 @@ test('the page describes its local-only purpose for people and search engines', 
   assert.match(html, /descriptionMetaEl\.content = t\.description;/);
 });
 
+test('crawler guidance is permissive, useful, and consistent with the product', () => {
+  assert.match(robots, /^User-agent: \*\r?\nAllow: \/\r?\n?$/);
+  assert.match(llms, /^# QR Code Generator & Reader/m);
+  assert.match(llms, /processed in the browser and are not uploaded/);
+  assert.match(llms, /\[Project README\]\(\.\/README\.md\)/);
+  assert.match(llms, /\[Product contract\]\(\.\/PRODUCT\.md\)/);
+});
+
 test('third-party QR libraries are version-pinned and integrity checked', () => {
   assert.match(html, /qrcode@1\.5\.1\/build\/qrcode\.min\.js/);
   assert.match(html, /jsqr@1\.4\.0\/dist\/jsQR\.js/);
@@ -26,6 +39,23 @@ test('third-party QR libraries are version-pinned and integrity checked', () => 
   assert.equal((html.match(/crossorigin="anonymous" referrerpolicy="no-referrer"/g) || []).length, 2);
   assert.doesNotMatch(html, /npm\/qrcode\/build/);
   assert.doesNotMatch(html, /npm\/jsqr\/dist/);
+});
+
+test('the content security policy allows only the current inline application script', () => {
+  const csp = html.match(/<meta http-equiv="Content-Security-Policy"\s+content="([^"]+)">/)?.[1];
+  const script = html.match(/<script>([\s\S]*)<\/script>/)?.[1];
+  assert.ok(csp, 'expected a Content Security Policy');
+  assert.ok(script, 'expected an inline application script');
+
+  const hash = createHash('sha256')
+    .update(script.replace(/\r\n?/g, '\n'))
+    .digest('base64');
+  assert.ok(csp.includes(`'sha256-${hash}'`), 'expected the current inline script hash');
+  assert.match(csp, /default-src 'none'/);
+  assert.match(csp, /script-src https:\/\/cdn\.jsdelivr\.net/);
+  assert.doesNotMatch(csp, /script-src[^;]*'unsafe-inline'/);
+  assert.match(csp, /connect-src 'self'/);
+  assert.match(html, /<meta name="referrer" content="no-referrer">/);
 });
 
 test('missing QR libraries and oversized images fail with recoverable guidance', () => {
@@ -94,6 +124,8 @@ test('decoder file failures are explicit, localized, and announced', () => {
   assert.match(html, /reader\.onerror = \(\) => finishDecode\(requestId, 'readFailed'\)/);
   assert.match(html, /reader\.onabort = \(\) => finishDecode\(requestId, 'readFailed'\)/);
   assert.match(html, /image\.onerror = \(\) => finishDecode\(requestId, 'imageFailed'\)/);
+  assert.match(html, /console\.error\('QR decoding failed', error\)/);
+  assert.match(html, /finishDecode\(requestId, 'decodeFailed'\)/);
   assert.match(html, /decodedState === 'loading'/);
   assert.match(html, /dropZoneEl\.setAttribute\('aria-busy'/);
   assert.match(html, /id="result" role="status" aria-live="polite"/);
@@ -183,6 +215,7 @@ test('Japanese and English decoder copy stay in sync', () => {
     'fileTooLarge',
     'readFailed',
     'imageFailed',
+    'decodeFailed',
     'decodeUnavailable',
   ]) {
     assert.equal((html.match(new RegExp(`${key}:`, 'g')) || []).length, 2, key);
